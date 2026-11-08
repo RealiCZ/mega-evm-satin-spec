@@ -31,6 +31,7 @@
 ## Satin (unstable)
 
 - [Satin Specification](satin/overview.md)
+- [Satin Rules](satin/rules.md)
 - [Base Layer](satin/base-layer.md)
 - [Satin EVM Overview](satin/evm/overview.md)
   - [Two-Pool Gas](satin/evm/gas-model.md)
