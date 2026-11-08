@@ -1,0 +1,84 @@
+---
+description: MegaETH formal specification — normative behavioral definitions for EVM execution, system contracts, oracle services, and protocol upgrades.
+spec: Rex6
+---
+
+# MegaETH Specification
+
+This is the formal specification of MegaETH's verifiable behavior — the complete, normative definition of how MegaETH processes transactions, enforces resource limits, and manages protocol state.
+It covers every behavioral difference from standard Ethereum and Optimism: the EVM modifications, system contracts, oracle services, resource metering, and the upgrade history that defines how these features evolved.
+
+Any node implementation that produces the same outputs given the same inputs for every case defined in this specification is a correct MegaETH node.
+
+The reference implementation is [MegaEVM](https://github.com/megaeth-labs/mega-evm), built on [revm](https://github.com/bluealloy/revm) and [op-revm](https://github.com/ethereum-optimism/optimism/tree/develop/rust/op-revm).
+All standard EVM semantics are inherited from Optimism Isthmus (Ethereum Prague) unless explicitly overridden.
+Transactions that don't touch MegaETH-specific features behave identically to Optimism.
+
+## Why MegaETH Differs from Standard Ethereum
+
+MegaETH is designed for real-time performance: sub-millisecond block times, extremely low base fees, and transaction gas limits far higher than Ethereum's.
+These properties break assumptions that standard EVM gas pricing relies on.
+
+Under standard EVM rules, MegaETH's low fees and high gas limits would make storage operations — state writes, logs, calldata — dramatically underpriced relative to their cost to node operators.
+A single transaction could bloat on-chain state or history data for nearly free.
+At the same time, MegaETH's parallel transaction execution requires mechanisms to detect and limit conflicts between concurrently executing transactions that read shared data.
+
+MegaETH addresses these problems with a targeted set of protocol-level modifications:
+
+- **[Dual Gas Model](evm/dual-gas-model.md)** — Adds a [storage gas](glossary.md#storage-gas) dimension on top of standard [compute gas](glossary.md#compute-gas), so state-heavy operations pay their true cost even when base fees are low.
+- **[Multidimensional Resource Limits](evm/resource-limits.md)** — Enforces four independent per-transaction limits (compute gas, data size, KV updates, state growth) beyond the standard gas limit, preventing any single resource from being exhausted by a single transaction.
+- **[Gas Detention](evm/gas-detention.md)** — Caps remaining compute gas after a transaction reads [volatile data](glossary.md#volatile-data) (block environment, oracle storage), forcing such transactions to terminate quickly and reducing parallel execution conflicts.
+- **[Dynamic Gas Costs](evm/dual-gas-model.md#dynamic-salt-multiplier)** — Scales storage gas based on [SALT bucket](glossary.md#salt-bucket) capacity, making writes to crowded state regions progressively more expensive while keeping fresh storage free.
+- **[System Contracts](system-contracts/overview.md)** — Pre-deployed protocol contracts providing oracle storage, high-precision timestamps, keyless deployment, and runtime access/limit control.
+
+## How to Use This Documentation
+
+This specification targets teams implementing MegaETH-compatible execution clients, auditors verifying protocol correctness, and anyone who needs the exact behavioral semantics of MegaEVM.
+
+Start with [Hardforks and Specs](hardfork-spec.md) to understand how behavior is versioned, then read each [Network Upgrade](upgrades/overview.md) page for the exact behavioral deltas introduced at each spec.
+For the current stable behavior as a single reference, see the [MegaEVM Overview](evm/overview.md).
+Satin, the unstable spec under development, is specified on its own in the [Satin section](satin/overview.md); the pages outside that section describe REX6.
+
+## Reference Implementation
+
+| Component        | Version                                                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------ |
+| **MegaEVM**      | [mega-evm](https://github.com/megaeth-labs/mega-evm)                                       |
+| **Base EVM**     | [revm v40.0.3](https://github.com/bluealloy/revm)                                          |
+| **Optimism EVM** | [op-revm v20.0.0](https://github.com/ethereum-optimism/optimism/tree/develop/rust/op-revm) |
+| **Alloy EVM**    | [alloy-evm v0.36.0](https://github.com/alloy-rs/alloy-evm)                                 |
+
+## Spec Progression
+
+MegaETH uses a spec system to version its verifiable behavior at each stage of the protocol's evolution.
+Each newer behavior-introducing spec includes all previous behaviors:
+
+```
+EQUIVALENCE → MINI_REX → MINI_REX_1 → MINI_REX_2 → REX → REX1 → REX2 → REX3 → REX4 → REX5 → REX6 → SATIN
+```
+
+`MINI_REX_1` and `MINI_REX_2` are [alias rungs](hardfork-spec.md#alias-specs-behavior-vs-position) with no behavior of their own: they execute `EQUIVALENCE` and `MINI_REX` behavior respectively, expressing a rollback while the spec ladder keeps climbing.
+
+{% hint style="info" %}
+**Backward Compatibility** — EVM semantics for frozen specs are fixed.
+A new spec may add behavior, but it never changes what an existing frozen spec does.
+Contracts deployed under a given spec will continue to behave identically, regardless of future upgrades.
+{% endhint %}
+
+- **EQUIVALENCE** — Baseline. Full Optimism Isthmus compatibility with block environment access tracking for parallel execution.
+- **MINI_REX** — Dual gas model, multidimensional resource limits, gas detention, 98/100 gas forwarding, SELFDESTRUCT disabled, Oracle and Timestamp system contracts.
+- **MINI_REX_1 / MINI_REX_2** — Alias rungs with no behavior of their own; they execute EQUIVALENCE and MINI_REX behavior respectively.
+- **REX** — Revised storage gas economics (`base × (multiplier − 1)`), transaction intrinsic storage gas, state growth tracking, consistent CALL-like opcode behavior.
+- **REX1** — Fix: compute gas limit reset between transactions.
+- **REX2** — SELFDESTRUCT re-enabled (EIP-6780), KeylessDeploy system contract.
+- **REX3** — Oracle gas cap raised to 20M, SLOAD-based oracle detention, keyless deploy compute gas tracking.
+- **REX4** — Per-call-frame resource budgets, relative gas detention, [storage gas stipend](glossary.md#storage-gas-stipend), MegaAccessControl and MegaLimitControl system contracts.
+- **REX5** — SequencerRegistry system contract, Oracle v2.0.0 with dynamic system address, caller-account update deduplication, storage-gas-stipend separated-allowance model, value-transfer CALL/CALLCODE parent compute-gas attribution, CREATE code-deposit compute-gas atomicity, EIP-2935/EIP-4788 pre-block gas floor with fail-closed block rejection, CREATE2 empty-initcode short-circuit, KeylessDeploy trailing-bytes rejection and empty-code log forwarding.
+- **REX6** — Unified per-opcode gas metering order, consolidated EIP-7702 authorization accounting, CREATE-frame accounting corrections, KeylessDeploy sandbox hardening, post-execution fee-reward accounting, system-originated transaction metering exemption, extended beneficiary detention coverage, and SequencerRegistry v2.0.0 rotation hardening.
+- **SATIN** — The **unstable** spec, not scheduled on any network. It restates MegaETH's execution rules on Optimism Karst (Ethereum Osaka) rather than adding to REX6's: EIP-8037 regular gas under a 200,000,000 execution cap with a state-gas reservoir, SALT-scaled state gas, history gas, data-size, KV-update and state-growth limits that stop the frame crossing them with a revert, gas detention on withheld gas, EIP-7708 transfer logs, and keyless deployment as a native creation. It is specified in the [Satin section](satin/overview.md).
+
+See [Hardforks and Specs](hardfork-spec.md) for full details.
+
+---
+
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this specification are to be interpreted as described in [BCP 14](https://www.rfc-editor.org/info/bcp14) ([RFC 2119](https://www.rfc-editor.org/rfc/rfc2119), [RFC 8174](https://www.rfc-editor.org/rfc/rfc8174)) when, and only when, they appear in all capitals, as shown here.

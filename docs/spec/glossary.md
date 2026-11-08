@@ -1,0 +1,235 @@
+---
+description: MegaETH glossary — definitions of protocol terms including EVM blocks, mini-blocks, compute gas, storage gas, and gas detention.
+spec: Rex6
+---
+
+# Glossary
+
+## EVM block
+
+A standard Ethereum-compatible block produced roughly every second.
+
+EVM blocks contain the same header fields and follow the same structure as blocks on other EVM chains, ensuring compatibility with existing tools, wallets, indexers, and applications.
+
+Every transaction appears in exactly one EVM block.
+Block-level EVM opcodes (`NUMBER`, `TIMESTAMP`, `COINBASE`, etc.) return values associated with the EVM block, not the mini-block.
+
+Often shortened to "block" when the context is unambiguous.
+
+## Mini-block
+
+A lightweight, high-frequency block produced roughly every 10 milliseconds.
+
+Mini-blocks are the native unit of sequencer preconfirmation in MegaETH.
+Transactions are packaged into mini-blocks as soon as they are executed, giving applications access to execution results with minimal latency via the Realtime API.
+
+Every transaction appears in exactly one mini-block and one EVM block.
+Transactions in a mini-block never span multiple EVM blocks.
+
+Mini-blocks contain a different, more compact set of metadata fields compared to EVM blocks.
+The ratio of mini-blocks to EVM blocks is roughly 100:1, though the exact number is not guaranteed.
+
+## Compute gas
+
+Standard EVM gas — identical to Ethereum (Optimism Isthmus / Ethereum Prague).
+
+Every opcode costs the same compute gas as it does on mainnet Ethereum (e.g., `ADD` = 3 gas, cold `SLOAD` = 2,100 gas).
+
+One of the two components of total gas cost in MegaETH's [dual gas model](evm/dual-gas-model.md).
+
+How much of an operation's inherited EVM gas is recorded as compute gas is defined in [Compute Gas Accounting](evm/compute-gas.md).
+
+## Storage gas
+
+Additional gas charged for operations that impose persistent storage burden on nodes (SSTORE, account creation, contract creation, code deposit, LOG, calldata).
+
+The other component of total gas cost.
+
+## Storage gas stipend
+
+A 23,000-gas allowance reserved for the callee of an internal `CALL` or `CALLCODE` that transfers value (value > 0).
+Top-level transaction calls, `DELEGATECALL`, `STATICCALL`, and [system contract](system-contracts/overview.md) interceptions do not qualify.
+
+Introduced in Rex4 to compensate for the 10× storage gas multiplier on LOG opcodes, which causes LOG events to exceed the standard EVM `CALL_STIPEND` (2,300 gas).
+
+The allowance is reserved exclusively for the storage-gas surcharges that MegaETH adds on top of standard EVM opcode costs: it does not increase the callee's [compute gas](#compute-gas) limit and cannot be spent on standard EVM opcode costs.
+The allowance never enters the callee frame's gas limit — each storage-gas surcharge site draws from the remaining allowance and charges only the residual against the frame's gas.
+Because it is never part of a frame's gas, any undrawn allowance is not returned to the caller and never contributes to gas rescued for the sender on early termination.
+
+See the [Rex4](upgrades/rex4.md) and [Rex5](upgrades/rex5.md) network upgrades for details.
+
+## State gas
+
+_(Satin, unstable)_ The [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) gas a transaction pays for the state it adds — a fresh storage slot, a new account, deployed code, an EIP-7702 delegation indicator — priced at MegaETH's cost per state byte and scaled by the [multiplier](#multiplier) of the [SALT bucket](#salt-bucket) the state lands in.
+It is drawn from the [reservoir](#reservoir) first, then from regular gas.
+
+See [State Gas and SALT Pricing](satin/evm/state-gas.md).
+
+## History gas
+
+_(Satin, unstable)_ Gas a transaction pays for the bytes it appends to the chain's history — its body, its logs, its [write records](#write-record) and its deployed code — at MegaETH's cost per history byte, never scaled by SALT.
+It is drawn from the [reservoir](#reservoir) first, then from regular gas.
+
+See [History Gas and the History Allowance](satin/evm/history-gas.md).
+
+## Execution cap
+
+_(Satin, unstable)_ The most regular gas one transaction can spend: 200,000,000.
+The part of a transaction's gas limit above it is the [reservoir](#reservoir).
+
+See [Two-Pool Gas](satin/evm/gas-model.md).
+
+## Reservoir
+
+_(Satin, unstable)_ The EIP-8037 state-gas reservoir: the part of a transaction's gas limit above the [execution cap](#execution-cap), which pays [state gas](#state-gas) and [history gas](#history-gas) before they spill onto regular gas.
+A child frame receives a share of what its caller has left of it.
+
+See [Two-Pool Gas](satin/evm/gas-model.md).
+
+## Write record
+
+_(Satin, unstable)_ One account or storage write a transaction keeps: an account's while its nonce, balance or code differs from what the transaction loaded, a slot's while its value differs from its original value in the transaction.
+Each weighs 40 bytes of data size and of [history gas](#history-gas), and the KV-update count is the number of write records.
+
+See [Resource Accounting](satin/evm/resource-accounting.md).
+
+## History allowance
+
+_(Satin, unstable)_ A 160-byte allowance of [history gas](#history-gas) that a value-transferring `CALL` or `CALLCODE` below the transaction's own frame grants the frame it starts, drawn only by that frame's logs.
+It replaces the [storage gas stipend](#storage-gas-stipend) under Satin.
+
+See [History Gas and the History Allowance](satin/evm/history-gas.md).
+
+## SALT
+
+Small Authentication Large Trie.
+
+MegaETH's memory-efficient authenticated key-value store for blockchain state, replacing Ethereum's Merkle Patricia Trie.
+
+SALT organizes state into fixed-size buckets that grow as more entries are added.
+
+The bucket structure is the basis for dynamic storage gas pricing in MegaEVM.
+
+See the [SALT repository](https://github.com/megaeth-labs/salt) for the data structure implementation.
+
+## SALT bucket
+
+The unit of storage in SALT.
+
+Each account and storage slot maps to a bucket based on its key.
+
+A bucket has a fixed capacity that doubles when it fills, triggering a bucket expansion.
+
+Bucket capacity serves as a state-density metric: larger buckets indicate more crowded state regions, and storage gas scales proportionally.
+
+Bucket capacity is determined by on-chain state of the parent block and cannot be predicted from contract code alone.
+
+## MIN_BUCKET_SIZE
+
+The smallest possible SALT bucket capacity, equal to **256** (2⁸).
+
+A bucket at minimum size has `multiplier = 1`, meaning dynamic storage gas (SSTORE, account creation, contract creation) is zero in Rex+ economics.
+
+As state density grows and buckets split, the multiplier increases.
+
+## Multiplier
+
+The ratio `bucket_capacity / MIN_BUCKET_SIZE` for a given SALT bucket.
+
+At `multiplier = 1` (minimum bucket), SSTORE/account/contract creation storage gas is zero (Rex+ formula: `base × (multiplier − 1)`).
+
+At `multiplier > 1`, storage gas scales linearly.
+
+The multiplier is determined per-account and per-storage-slot based on which SALT bucket they reside in.
+
+## Gas detention
+
+A mechanism that caps remaining compute gas after a transaction accesses [volatile data](evm/gas-detention.md).
+
+Forces transactions that read shared state to terminate quickly, reducing parallel execution conflicts.
+
+Detained gas is refunded at transaction end.
+
+## Volatile data
+
+Block environment fields (NUMBER, TIMESTAMP, COINBASE, etc.), the block beneficiary's account state, and oracle contract storage.
+
+These are frequently accessed by many transactions and are a major source of parallel execution conflicts.
+
+## Detained limit
+
+The effective compute gas cap imposed by [gas detention](evm/gas-detention.md).
+
+A relative cap of `current_usage + cap` set at the time of volatile access; if the transaction's compute gas usage later exceeds this cap, execution halts immediately.
+
+In Rex3 and earlier, this was an absolute cap on total compute gas for the transaction: if the transaction had already consumed more gas than the cap when the volatile access occurred, execution halted immediately at that point.
+The relative-cap definition above was introduced in [Rex4](upgrades/rex4.md).
+
+## Beneficiary
+
+The block coinbase address (the account that receives block rewards and priority fees).
+
+Accessing the beneficiary's account triggers gas detention.
+
+Not to be confused with the SELFDESTRUCT target address.
+
+## Resource dimension
+
+One of four independent limits enforced per transaction: compute gas, data size, KV updates, and state growth.
+
+See [resource limits](evm/resource-limits.md).
+
+## Call frame
+
+A single execution context within a transaction, corresponding to a message call (CALL, STATICCALL, DELEGATECALL, CALLCODE) or a contract creation (CREATE, CREATE2) as defined in the [Ethereum Yellow Paper](https://ethereum.github.io/yellowpaper/paper.pdf).
+
+The top-level transaction itself is also a call frame.
+
+Call frames nest: each CALL or CREATE within a transaction creates a child call frame.
+
+Resource trackers (data size, KV updates, state growth) are call-frame-aware — usage within a child call frame is discarded if the child reverts.
+
+## Call-frame-local exceed
+
+When a call frame exceeds its per-call-frame resource budget, the call frame **reverts** with `MegaLimitExceeded(uint8 kind, uint64 limit)`.
+
+The parent call frame can continue executing.
+
+Distinct from a transaction-level exceed, which **halts** the entire transaction.
+
+Per-call-frame resource budgets are introduced in Rex4.
+
+## Spec (`MegaSpecId`)
+
+A set of MegaETH verifiable behaviors: the complete definition of what a correct node does at a given stage.
+
+Captures the execution-layer semantics that determine node correctness.
+
+Progression: `EQUIVALENCE → MINI_REX → MINI_REX_1 → MINI_REX_2 → REX → REX1 → REX2 → REX3 → REX4 → REX5 → REX6 → SATIN`.
+`SATIN` is unstable; it is specified in the [Satin section](satin/overview.md).
+`MINI_REX_1` and `MINI_REX_2` are [alias rungs](#alias-spec) executing `EQUIVALENCE` and `MINI_REX` behavior respectively.
+
+## Alias Spec
+
+A spec rung whose behavior is defined to be identical to an earlier spec.
+Alias specs express rollbacks while keeping the spec ladder monotone: `MINI_REX_1` (behavior: `EQUIVALENCE`) and `MINI_REX_2` (behavior: `MINI_REX`).
+The rung's position governs one-way chain setup; its behavior governs execution semantics.
+
+See [Hardforks and Specs](hardfork-spec.md).
+
+## Hardfork (`MegaHardfork`)
+
+A network upgrade event: when changes are activated on the chain.
+
+A hardfork may include protocol-level changes beyond MegaEVM (e.g., networking, state sync, RPC behavior).
+
+Hardforks map one-to-one onto specs; a rollback hardfork schedules an [alias spec](#alias-spec) (e.g., MiniRex1 → MINI_REX_1, whose behavior is EQUIVALENCE).
+
+## `MEGA_SYSTEM_ADDRESS`
+
+The authorized sender for [Mega System Transactions](system-contracts/system-tx.md).
+
+- Resolved per block from [`SequencerRegistry.currentSystemAddress()`](system-contracts/sequencer-registry.md) after all pre-block changes are committed.
+- The fixed constant `0xA887dCB9D5f39Ef79272801d05Abdf707CFBbD1d` (defined in [system-tx.md § Constants](system-contracts/system-tx.md#constants)) is the genesis seed value used to initialize the registry at deploy time.
+
+Exempt from oracle [gas detention](evm/gas-detention.md); carries [Oracle](system-contracts/oracle.md) write authority.

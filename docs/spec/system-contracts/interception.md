@@ -1,0 +1,114 @@
+---
+description: Generic call-interception mechanism for MegaETH system contracts — frame-init hook, selector matching, intercepted vs. fall-through semantics, gas treatment, and call-scheme rules.
+spec: Rex6
+---
+
+# Call Interception
+
+This page specifies the generic mechanism by which MegaETH intercepts calls to system-contract addresses at the EVM level.
+It defines when interception fires, how selectors are matched, what happens on match or mismatch, and the gas rules that apply to all intercepted calls.
+
+Each system-contract page defines its own interception policy: which address is intercepted, which function selectors are handled, which call schemes are eligible, and any function-specific preconditions or gas charges.
+
+## Motivation
+
+Some system-contract functions require protocol-level side effects that cannot be expressed by ordinary EVM bytecode alone.
+Examples include forwarding data to an external backend, executing logic inside a sandboxed EVM instance, or querying EVM-internal accounting state that is not accessible to contract bytecode.
+
+Rather than introducing new opcodes or precompiles for each such function, MegaETH intercepts ordinary call operations targeting known system-contract addresses and matching known function selectors.
+This allows contracts to invoke protocol-level behavior through standard Solidity call syntax while keeping the system-contract ABI stable.
+
+## Specification
+
+### Interception Point
+
+Interception fires during call-frame initialization, before a child call frame is created.
+
+For a call made by a `CALL`-family opcode, that point is after the opcode has executed, so the opcode-level gas accounting (including the [gas forwarding](../evm/gas-forwarding.md) cap and new-account storage-gas charges) has already been applied.
+
+A transaction whose recipient is a system contract is also intercepted, at the same frame-initialization point.
+No opcode initiates that call, so none of the opcode-level accounting above applies to it.
+A node MUST NOT require an initiating opcode for interception: a transaction that targets a system contract directly is intercepted all the same.
+A system contract's own dispatch policy MAY additionally restrict which calls it intercepts — [KeylessDeploy](keyless-deploy.md) intercepts only top-level transactions and lets opcode-initiated calls fall through to its on-chain bytecode.
+
+A system contract MAY intercept `CALL` or `STATICCALL`, but MUST NOT intercept `DELEGATECALL`, `CALLCODE`, `CREATE`, or `CREATE2`.
+
+### Call-Depth Gate
+
+Interceptor dispatch MUST respect the EVM call-stack depth limit.
+For a `CALL` or `STATICCALL` whose call depth exceeds `CALL_STACK_LIMIT`, a node MUST NOT consult any interceptor.
+Such a call MUST follow the same depth-failure path an ordinary over-deep call follows: the node MUST produce a synthetic too-deep call result that consumes no gas (the forwarded gas limit is fully refundable to the caller) and MUST NOT perform any interceptor side effect.
+
+When both a transaction-level resource-limit overflow and the depth limit apply to the same call, the resource-limit overflow result takes priority over the depth-gate result.
+
+### Matching
+
+Each interceptor MUST check the following, in order:
+
+1. **Address**: Compare the call's target address against the interceptor's system-contract address.
+   If the address does not match, the interceptor MUST fall through.
+2. **Selector**: Decode the first four bytes of the call input as a function selector.
+   If the selector matches one of the interceptor's handled functions, the interceptor MUST handle the call as specified on the corresponding system-contract page.
+   If the selector does not match any handled function, the interceptor MUST fall through.
+
+### Interception Outcomes
+
+An interceptor MUST produce one of two outcomes:
+
+- **Intercepted**: The interceptor returns a synthetic call result directly.
+  The system contract's on-chain bytecode does not execute.
+- **Fall-through**: The interceptor produces no result.
+  Normal child-frame execution proceeds and the system contract's on-chain bytecode executes.
+
+### Fall-Through to Bytecode
+
+If a call targeting a system-contract address is not intercepted, normal frame initialization MUST proceed and the system contract's deployed bytecode MUST execute.
+The fall-through behavior is defined by each system contract's on-chain bytecode.
+
+### Gas Semantics
+
+Where a call opcode initiates the call, its own gas costs (including the [gas forwarding](../evm/gas-forwarding.md) cap adjustment) MUST be charged before interception fires.
+These costs are not refunded.
+
+By default, an intercepted call consumes zero gas from the forwarded gas limit.
+Each system contract MAY define additional gas consumption for its intercepted functions.
+
+An intercepted call MUST NOT receive a [storage gas stipend](../glossary.md#storage-gas-stipend).
+The stipend is only applicable on fall-through.
+
+## Constants
+
+| Constant           | Value | Description                                                            |
+| ------------------ | ----- | ---------------------------------------------------------------------- |
+| `CALL_STACK_LIMIT` | 1,024 | Maximum EVM call-stack depth; calls deeper than this fail as too-deep. |
+
+## Rationale
+
+**Why intercept at frame initialization rather than call dispatch?**
+Interception fires at frame initialization — for an opcode-initiated call, after the opcode has executed and gas forwarding has been applied — but before a child frame is created.
+This ensures that opcode-level gas accounting (including the gas forwarding cap and new-account storage-gas charges) is already settled.
+Intercepting earlier (at opcode decode) would require reimplementing gas accounting inside each interceptor; intercepting later (inside the child frame) would require creating and then discarding a frame, wasting resources.
+
+**Why exclude DELEGATECALL and CALLCODE?**
+DELEGATECALL and CALLCODE execute the target's code in the caller's context — `msg.sender`, `msg.value`, and storage all belong to the caller, not the target.
+Intercepting these call schemes would mean the interceptor runs with the caller's identity and state, which is inconsistent with the system contract's intended semantics.
+Excluding them keeps interception limited to schemes where the system contract's address is both the target and the execution context.
+
+**Why gate interception on call depth?**
+The depth check that rejects over-deep calls for ordinary contracts lives inside child-frame creation, which runs after interception.
+Without an explicit depth gate, an interceptor could short-circuit and return a synthetic success at a call depth that a normal call would reject, letting a system contract be invoked beyond the EVM call-stack limit.
+Applying the depth gate before interceptor dispatch keeps the depth-failure behavior identical for system-contract calls and ordinary calls.
+
+## Security Considerations
+
+**Unknown selectors MUST fall through to on-chain bytecode.**
+If an interceptor silently consumed calls with unrecognized selectors, it could mask contract bugs or produce unexpected silent success.
+The fall-through requirement ensures that unrecognized calls execute the system contract's deployed bytecode, which reverts with a stable custom error (e.g., `NotIntercepted()`).
+
+**Intercepted calls do not receive a storage gas stipend.**
+This is a deliberate design choice, not a security constraint.
+
+## Spec History
+
+- [Rex2](../upgrades/rex2.md) introduced the call-interception mechanism.
+- [Rex5](../upgrades/rex5.md) gated interceptor dispatch on the `CALL_STACK_LIMIT` call-depth limit, so over-deep calls to system contracts fail as too-deep instead of being intercepted.
