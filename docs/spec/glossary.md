@@ -61,7 +61,7 @@ See the [Rex4](upgrades/rex4.md) and [Rex5](upgrades/rex5.md) network upgrades f
 ## State gas
 
 _(Satin, unstable)_ The [EIP-8037](https://eips.ethereum.org/EIPS/eip-8037) gas a transaction pays for the state it adds — a fresh storage slot, a new account, deployed code, an EIP-7702 delegation indicator — priced at MegaETH's cost per state byte and scaled by the [multiplier](#multiplier) of the [SALT bucket](#salt-bucket) the state lands in.
-It is drawn from the [reservoir](#reservoir) first, then from regular gas.
+It is drawn from the [reservoir](#reservoir) first, then from regular gas; the legacy share of a fresh slot, a new account or a created account an opcode makes is drawn from regular gas first.
 
 See [State Gas and SALT Pricing](satin/evm/state-gas.md).
 
