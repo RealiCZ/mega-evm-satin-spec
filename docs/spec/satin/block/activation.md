@@ -14,9 +14,9 @@ Abstract: When Satin takes effect and how a chain configuration schedules it; th
 
 ## Motivation
 
-Satin restates the execution layer; it does not deploy or migrate anything.
+The spec restates the execution layer; it does not deploy or migrate anything.
 It therefore runs only on a chain that already holds what it expects — the six system contracts at known code, the `CREATE2` factory, the L1 block contract — and on a base whose forks are all active by the time it starts.
-A node that started Satin at another block, ran it on a chain without those contracts, or took a protocol value from its own configuration, would execute a different chain from every other node, and the difference might only show long after activation.
+A node that started the spec at another block, ran it on a chain without those contracts, or took a protocol value from its own configuration, would execute a different chain from every other node, and the difference might only show long after activation.
 
 ## Specification
 

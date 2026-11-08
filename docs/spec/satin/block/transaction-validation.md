@@ -16,7 +16,7 @@ Abstract: The checks a transaction must pass before it can be included in a bloc
 
 A transaction a node rejects never reaches a block; one it includes changes state and pays for what it ran.
 Two nodes that refuse different transactions build or accept different blocks, and a transaction pool that refuses for another reason than block execution keeps transactions no block can hold, or drops ones it could.
-Satin adds checks of its own to the base layer's — a body too large for the data-size limit, a gas limit that cannot pay the body's history gas, a gas limit above the execution cap whose intrinsic gas does not fit under it — and turns the chain-id check on, which Rex6 ran off in every configuration, so that a transaction signed for another chain or without a chain id is no longer valid.
+Beyond the base layer's checks, a transaction can carry a body too large for the transaction's data-size limit, a gas limit that cannot pay the history gas of its body, or a gas limit above the execution cap with intrinsic gas that does not fit under it; and a transaction signed for another chain, or a typed transaction without a chain id, can be replayed on MegaETH unless its chain id is checked.
 
 ## Specification
 

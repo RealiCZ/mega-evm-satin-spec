@@ -16,7 +16,7 @@ Abstract: The base Satin builds on, Optimism Karst with its Ethereum base Osaka;
 
 A MegaETH node executes standard EVM, transaction and block rules for everything MegaETH does not change, and two nodes that take those rules from different bases execute different chains.
 The Rex-era specs build on Optimism Isthmus (Ethereum Prague).
-Optimism Karst carries Jovian's and Karst's block rules (deposit-only activation blocks, the data-availability footprint limit, the operator fee) and Osaka's EVM changes; a node that ran Satin's own rules on Isthmus would miss those, and one that applied Karst's inherited transaction caps would refuse MegaETH's large transactions: EIP-7825 caps a transaction's gas limit at 16,777,216, and EIP-8037 caps a transaction's total gas at 2^32 − 1, while a MegaETH transaction's gas limit is bounded only by its block's.
+Optimism Karst carries Jovian's and Karst's block rules (deposit-only activation blocks, the data-availability footprint limit, the operator fee) and Osaka's EVM changes; a node that ran MegaETH's rules on Isthmus would miss those, and one that applied Karst's inherited transaction caps would refuse MegaETH's large transactions: EIP-7825 caps a transaction's gas limit at 16,777,216, and EIP-8037 caps a transaction's total gas at 2^32 − 1, while a MegaETH transaction's gas limit is bounded only by its block's.
 
 ## Specification
 
