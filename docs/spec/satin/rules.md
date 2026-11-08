@@ -74,7 +74,7 @@ Home: [Gas Schedule and Intrinsic Gas](evm/gas-schedule.md)
 | [`SATIN-SCHED-004`](evm/gas-schedule.md) | A cold `SSTORE` MUST pay `COLD_STORAGE_ACCESS` (2,100) for its access together with its static cost, as a cold `SLOAD` does: EIP-8038 folds the warm base into a cold slot's access. |
 | [`SATIN-SCHED-005`](evm/gas-schedule.md) | The floor's base MUST be the transaction's own decomposed base of `SATIN-SCHED-006` without its calldata, access-list, authorization and initcode costs: `TX_BASE_COST` for a transaction to its sender, `TX_BASE_COST +` … |
 | [`SATIN-SCHED-006`](evm/gas-schedule.md) | The intrinsic regular gas of a transaction MUST be `TX_BASE_COST`, plus, for a call to an account other than the sender, `COLD_ACCOUNT_ACCESS` for the recipient's access and `TX_VALUE_COST` more when it carries value; … |
-| [`SATIN-SCHED-007`](evm/gas-schedule.md) | The `PER_AUTH_BASE_COST` of every authorization entry MUST be charged by the transaction's validation, as every intrinsic entry is, whether or not the authorization will apply; an authority MUST be refunded nothing when … |
+| [`SATIN-SCHED-007`](evm/gas-schedule.md) | The `PER_AUTH_BASE_COST` of every authorization entry MUST be charged by the transaction's validation, as every intrinsic entry is, whether or not the authorization will apply; an authority that already exists MUST be … |
 | [`SATIN-SCHED-008`](evm/gas-schedule.md) | The state-dependent parts of a transaction's cost MUST be charged at the start of its execution, before its first frame, as EIP-2780 and EIP-8037 specify, every state charge priced as State Gas and SALT Pricing says and … |
 | [`SATIN-SCHED-009`](evm/gas-schedule.md) | A transaction that cannot pay a charge of `SATIN-SCHED-008` — the account a deposit creates for its caller, an authorization's charges, the history of the records made outside a frame, or the charge for the first … |
 | [`SATIN-SCHED-010`](evm/gas-schedule.md) | On that path everything applied before the first frame MUST be taken back, except what validation did to the sender's account (its fee and a call's nonce bump) and the account a deposit created for its caller: the … |
@@ -99,7 +99,7 @@ Home: [State Gas and SALT Pricing](evm/state-gas.md)
 | [`SATIN-STATE-008`](evm/state-gas.md) | The only `SSTORE` that charges fresh-slot state gas MUST be one whose original value in the transaction is zero, whose present value is zero, and whose new value is not zero. |
 | [`SATIN-STATE-009`](evm/state-gas.md) | A system-originated transaction and a system call (Mega System Transactions and the Protocol's Own Transactions) MUST be priced at `m = 1` and MUST NOT read a bucket capacity. |
 | [`SATIN-STATE-010`](evm/state-gas.md) | The SALT bucket an account or a storage slot lands in MUST be the bucket SALT's own definition assigns to its key: the mapping from an account or a slot to its bucket is an input to this specification, as the bucket … |
-| [`SATIN-STATE-011`](evm/state-gas.md) | Every new-account and created-account charge of `SATIN-STATE-004`, and the state-growth rise that goes with it (Resource Accounting), MUST be decided by one predicate: the account is empty under EIP-161 — the state … |
+| [`SATIN-STATE-011`](evm/state-gas.md) | Every new-account and created-account charge of `SATIN-STATE-004`, and the state-growth rise that goes with it (Resource Accounting), MUST be decided, when the charge is decided, by one of two predicates: |
 
 ## History Gas and the History Allowance
 
@@ -213,7 +213,7 @@ Home: [Resource Accounting](evm/resource-accounting.md)
 | [`SATIN-ACCT-012`](evm/resource-accounting.md) | The KV count MUST be the write-record count, held to `TX_KV_UPDATE_LIMIT`; the five fixed records of the body (`SATIN-HIST-003`) are not in it. |
 | [`SATIN-ACCT-013`](evm/resource-accounting.md) | State growth MUST be the net count of new accounts and new storage slots the transaction keeps: each rise is one unit at an account-leaf or fresh-slot state charge site (State Gas and SALT Pricing), not one unit per … |
 | [`SATIN-ACCT-014`](evm/resource-accounting.md) | The rises MUST be exactly: |
-| [`SATIN-ACCT-015`](evm/resource-accounting.md) | An account that is not empty under EIP-161 MUST NOT be a rise, and neither MUST a `CALLCODE`, a value call to the calling account itself, deployed code, or a delegation indicator. |
+| [`SATIN-ACCT-015`](evm/resource-accounting.md) | An account that is not empty under EIP-161 MUST NOT be a rise, an authority whose account the state holds MUST NOT be one either, and neither MUST a `CALLCODE`, a value call to the calling account itself, deployed code, … |
 | [`SATIN-ACCT-016`](evm/resource-accounting.md) | An `SSTORE` MUST change state growth by this table alone, whose columns are the slot's original value in the transaction, its present value, and the value written: |
 | [`SATIN-ACCT-017`](evm/resource-accounting.md) | The fee credits the settlement writes MUST NOT be rises and are not EIP-8037 charge sites. |
 | [`SATIN-ACCT-018`](evm/resource-accounting.md) | A fall MUST happen at the opcode that restores the state, and a fall cannot cross a limit. |

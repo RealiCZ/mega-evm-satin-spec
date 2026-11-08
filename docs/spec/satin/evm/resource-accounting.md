@@ -59,14 +59,14 @@ Counting state growth without its falls stops a transaction that creates and rem
   - a value `CALL` to an account empty under EIP-161;
   - a `SELFDESTRUCT` that moves a non-zero balance to a distinct account empty under EIP-161 ([SELFDESTRUCT and the Destruction Table](selfdestruct.md));
   - the recipient of a transaction's value, when it is empty under EIP-161;
-  - an applied EIP-7702 authorization whose authority is empty under EIP-161;
+  - an applied EIP-7702 authorization whose authority the state holds no account for;
   - a `CREATE`, a `CREATE2`, a creation transaction or a keyless creation, when the created address is empty under EIP-161;
   - a keyless signer's account, when the creation's nonce bump creates it, counted on the keyless call ([KeylessDeploy](../system-contracts/keyless-deploy.md));
   - the caller account of a deposit, a Mega System Transaction executed as a deposit included, when that caller is empty under EIP-161, once (`SATIN-ACCT-020`, `SATIN-DEP-003`).
 
-  Each is decided by the predicate of `SATIN-STATE-011`: the account is empty under EIP-161 — no account, or nonce zero, zero balance and no code.
-- `SATIN-ACCT-015` An account that is not empty under EIP-161 MUST NOT be a rise, and neither MUST a `CALLCODE`, a value call to the calling account itself, deployed code, or a delegation indicator.
-  An account whose leaf is in the state but is empty under EIP-161 is the exception to existence: at the sites of `SATIN-ACCT-014` it MUST be a rise as an absent account is, although the witness answers it as a leaf (`SATIN-WIT-017`).
+  Each is decided by the predicates of `SATIN-STATE-011`: an authority by existence — the state holds no account at its address — and every other site by EIP-161 emptiness — no account, or nonce zero, zero balance and no code.
+- `SATIN-ACCT-015` An account that is not empty under EIP-161 MUST NOT be a rise, an authority whose account the state holds MUST NOT be one either, and neither MUST a `CALLCODE`, a value call to the calling account itself, deployed code, or a delegation indicator.
+  An account whose leaf is in the state but is empty under EIP-161 is the exception to existence at every site of `SATIN-ACCT-014` but an authority: there it MUST be a rise as an absent account is, although the witness answers it as a leaf (`SATIN-WIT-017`); as an applied authorization's authority it is not a rise.
 - `SATIN-ACCT-016` An `SSTORE` MUST change state growth by this table alone, whose columns are the slot's original value in the transaction, its present value, and the value written:
 
   | Original | Present  | New      | State growth |

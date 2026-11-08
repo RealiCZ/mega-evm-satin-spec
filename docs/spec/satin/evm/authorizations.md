@@ -46,7 +46,7 @@ Which authorities a list would create or change depends on the state — whether
 
 - `SATIN-AUTH-008` The totals the list would keep, were it applied, MUST be:
   - one write record for each distinct accepted authority other than the sender, whose account is a fixed record of the body (`SATIN-ACCT-008`), however many of its entries are accepted;
-  - one unit of state growth for each distinct accepted authority whose account is empty under EIP-161 (`SATIN-STATE-011`), however many of its entries are accepted;
+  - one unit of state growth for each distinct accepted authority whose account does not exist — the state holds no account at its address, an account empty under EIP-161 counting as existing (`SATIN-STATE-011`) — however many of its entries are accepted;
   - the new-account state gas once for each such new authority.
 - `SATIN-AUTH-009` Delegation-indicator state gas MUST be charged at most once per authority, and only when an accepted authorization writes a non-zero delegation designator, the authority holds no delegation indicator at the start of the transaction, and no earlier authorization in the list set one for it.
   An authority that holds an indicator at the start of the transaction is charged none, a clear and a later non-zero authorization included; a clear charges none and gives back none, an indicator an earlier authorization of the list set and paid for included; two accepted non-zero authorizations for an authority that holds none at the start charge it once.
@@ -92,7 +92,7 @@ None.
 ## Rationale
 
 **Why simulate the whole list before applying any of it?**
-Whether the list fits is a property of the whole list: a later entry for the same authority neither adds an account nor a record, and an authority that is not empty under EIP-161 adds no growth.
+Whether the list fits is a property of the whole list: a later entry for the same authority neither adds an account nor a record, and an authority that already exists adds no growth.
 Deciding before applying anything means a list that does not fit leaves nothing applied, and the node never has to undo part of a list.
 
 **Why every list, and not only a long one?**

@@ -46,14 +46,18 @@ A price that reads the bucket again at each charge also lets a give-back return 
 
 - `SATIN-STATE-004` A state charge MUST be made where the state is added:
   - a fresh slot, by the `SSTORE` that fills it (`SATIN-STATE-008`);
-  - a new account, by the `CALL` that moves value to an account empty under EIP-161, by a `SELFDESTRUCT` that moves a non-zero balance to a distinct account empty under EIP-161, by the transaction whose value goes to a recipient empty under EIP-161, by an applied EIP-7702 authorization whose authority is empty under EIP-161, by a deposit or a Mega System Transaction whose caller is empty under EIP-161 ([Deposit Transactions](../block/deposits.md)), and by a keyless deployment whose signer's account is empty under EIP-161 ([KeylessDeploy](../system-contracts/keyless-deploy.md));
+  - a new account, by the `CALL` that moves value to an account empty under EIP-161, by a `SELFDESTRUCT` that moves a non-zero balance to a distinct account empty under EIP-161, by the transaction whose value goes to a recipient empty under EIP-161, by an applied EIP-7702 authorization whose authority the state holds no account for, by a deposit or a Mega System Transaction whose caller is empty under EIP-161 ([Deposit Transactions](../block/deposits.md)), and by a keyless deployment whose signer's account is empty under EIP-161 ([KeylessDeploy](../system-contracts/keyless-deploy.md));
   - a created account, by `CREATE`, `CREATE2` or a creation transaction, when the created address is empty under EIP-161, and by a keyless deployment's creation ([KeylessDeploy](../system-contracts/keyless-deploy.md));
   - deployed code, at the code deposit ([Gas Schedule and Intrinsic Gas](gas-schedule.md));
   - a delegation indicator, by the applied authorization that writes it ([EIP-7702 Authorizations Before the First Frame](authorizations.md)).
 
   When each of these is charged relative to the opcode's other charges is specified on [History Gas and the History Allowance](history-gas.md) and [Gas Schedule and Intrinsic Gas](gas-schedule.md); how it draws the pools is `SATIN-POOL-008` ([Two-Pool Gas](gas-model.md)).
-- `SATIN-STATE-011` Every new-account and created-account charge of `SATIN-STATE-004`, and the state-growth rise that goes with it ([Resource Accounting](resource-accounting.md)), MUST be decided by one predicate: the account is empty under EIP-161 — the state holds no account at the address, or the account it holds has nonce zero, zero balance and no code — when the charge is decided.
-  An account whose leaf is in the state but is empty under EIP-161 is charged and counted as an absent one; the distinction between no account and an empty leaf is made by the witness ([The Stateless Witness](../block/stateless-witness.md)) and by the destruction table ([SELFDESTRUCT and the Destruction Table](selfdestruct.md)), never by these charges.
+- `SATIN-STATE-011` Every new-account and created-account charge of `SATIN-STATE-004`, and the state-growth rise that goes with it ([Resource Accounting](resource-accounting.md)), MUST be decided, when the charge is decided, by one of two predicates:
+  - **existence**, for the authority of an applied EIP-7702 authorization alone: the authority is new when the state holds no account at its address; an account whose leaf the state holds is not new, an account empty under EIP-161 included ([EIP-7702 Authorizations Before the First Frame](authorizations.md));
+  - **EIP-161 emptiness**, for every other site — a deposit's or Mega System Transaction's caller, a value call's recipient, a transaction's value recipient, a `SELFDESTRUCT`'s beneficiary, a created address and a keyless deployment's signer: the account is new when the state holds no account at the address, or the account it holds has nonce zero, zero balance and no code.
+
+  At a site decided by emptiness, an account whose leaf is in the state but is empty under EIP-161 is charged and counted as an absent one.
+  Apart from an authority's charge, the distinction between no account and an empty leaf is made only by the witness ([The Stateless Witness](../block/stateless-witness.md)) and by the destruction table ([SELFDESTRUCT and the Destruction Table](selfdestruct.md)).
 - `SATIN-STATE-008` The only `SSTORE` that charges fresh-slot state gas MUST be one whose original value in the transaction is zero, whose present value is zero, and whose new value is not zero.
   The only `SSTORE` that gives it back MUST be one whose original value is zero, whose present value is not zero, and whose new value is zero, unless the slot's account is marked for deletion ([SELFDESTRUCT and the Destruction Table](selfdestruct.md)); the give-back MUST be the price the slot was charged, credited to the frame running that `SSTORE` whichever frame paid the charge, in the refill order of [History Gas and the History Allowance](history-gas.md) (`SATIN-HIST-007`).
   Every other `SSTORE` transition MUST charge no fresh-slot state gas and give none back.
@@ -106,9 +110,10 @@ So the transaction gets no outcome, and the node reports the fault.
 **Why reference SALT's mapping instead of restating it?**
 The bucket a key lands in is SALT's own definition, as the capacities are SALT's state; this specification prices by the bucket SALT names, and two nodes that disagree on the mapping disagree on SALT itself.
 
-**Why EIP-161 emptiness for every new-account charge?**
-Since EIP-161 Ethereum treats an empty account as a dead one: `CALL` charges its new-account cost for a value sent to an empty account, whether or not a leaf is stored for it.
-One predicate for every site — a value call, a `SELFDESTRUCT`'s beneficiary, a transaction's recipient, an authority, a deposit's caller, a created address — keeps an empty leaf from being priced as new at one site and as existing at another, and keeps the state gas and the state-growth count of the same account in step.
+**Why EIP-161 emptiness, and existence for an authority?**
+Since EIP-161 Ethereum treats an empty account as a dead one: `CALL` charges its new-account cost for a value sent to an empty account, whether or not a leaf is stored for it, and Ethereum's Amsterdam specification decides a value call's, a `SELFDESTRUCT`'s and a creation's new account by that test.
+Using it at every such site — a value call, a `SELFDESTRUCT`'s beneficiary, a transaction's recipient, a deposit's caller, a created address — keeps an empty leaf from being priced as new at one site and as existing at another, and keeps the state gas and the state-growth count of the same account in step.
+EIP-7702 decides its authority differently, by whether the authority exists in the trie, and the Amsterdam specification charges an authority's new account by that test; Rex6 did the same, so an authority keeps it.
 The witness still tells an empty leaf from no account, because a stateless validator must be able to rebuild the state root, and the destruction table still reads the leaf's presence at the transaction's start, because it gives back only what the transaction added.
 
 ## Security Considerations

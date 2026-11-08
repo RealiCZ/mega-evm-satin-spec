@@ -2,17 +2,18 @@
 
 Every place where implementation (a) or implementation (b) differs from the text of the Satin execution pages (`docs/spec/satin/evm/`), by rule id.
 (a) is mega-evm `5e3f30ad` (`crates/mega-evm/src/`, its revm fork at `4c8f0d43` written `revm:`); (b) is the `next/` workspace at mega-evm `785182eb` (`next/mega-evm2/src/`, written `b:`), with the evm2 fork at `91518705` (`crates/evm2/src/`, written `evm2:`).
-Line numbers are of those revisions, except rows 11 to 13, which were read at (b) `d04e8f80` on the evm2 fork at `8751da2b`, and (a) at the same `5e3f30ad`.
+Line numbers are of those revisions, except row 11, which was read at (b) `d04e8f80` on the evm2 fork at `8751da2b`, and (a) at the same `5e3f30ad`.
 Each change follows an owner decision recorded in [decisions.md](decisions.md); a value or behaviour not listed here was found to match the text in both implementations, or was not reached by this check (see "Not checked" below).
 
 ## Counts
 
 | Implementation | Changes | Of which latent (no observable difference today) |
 | --- | --- | --- |
-| (a) | 3 | 0 |
-| (b) | 10 | 2 |
+| (a) | 2 | 0 |
+| (b) | 9 | 2 |
 
-Three decisions change both implementations (QD-01: rows 1 and 2; QE-01: rows 3 and 4; QH-02: rows 11 and 12); each row above is counted once, under its implementation.
+Two decisions change both implementations (QD-01: rows 1 and 2; QE-01: rows 3 and 4); each row above is counted once, under its implementation.
+QH-01 and QH-02 (as amended) change neither.
 
 ## Changes
 
@@ -28,9 +29,7 @@ Three decisions change both implementations (QD-01: rows 1 and 2; QE-01: rows 3 
 | 8 | `SATIN-STATE-010` | (b) | `b:ledger.rs:599–612` (`bucket_id` is an FNV-1a test hasher unless the `salt-ahash` feature, `next/mega-evm2/Cargo.toml:36`, is on) | Make SALT's production hasher the default | QA-04 |
 | 9 | `SATIN-LIM-015` | (b) | evm2's initial frame for types 0, 1 and 2 (`evm2:ethereum/mod.rs:572` `prepare_initial_frame`) deploys at the address of nonce `2^64 − 1` when the nonce check is off; `b:tx.rs:695–710` (`creation_nonce_unbumpable`) handles deposits only | A creation transaction whose sender's nonce cannot be bumped creates nothing and succeeds, as (a) and both deposit paths do | QA-08 |
 | 10 | `SATIN-SCHED-001`, `SATIN-STATE-003` (latent) | (b) | `b:lib.rs:249–265` (`satin_version` rebuilds four state-gas entries at `CPSB` but leaves `TxEip7702PerAuthState` at Amsterdam's `23 × 1,530`, `evm2:version/mod.rs:895`) | Rebuild the delegation-indicator entry from `CPSB` too; the value is equal today, and differs only once the cost per state byte changes | none (the rule's own text) |
-| 11 | `SATIN-STATE-011`, `SATIN-SCHED-008` step 2, `SATIN-AUTH-008`, `SATIN-ACCT-014` | (a) | `revm:crates/handler/src/pre_execution.rs:394–398` (an authority "existed" unless its info is empty **and** it was loaded as not existing and not touched), charge at `:417–428`; `evm/execution.rs:1476–1478` (the list simulation's `absent`, the same test) and `:1597–1602` (the applied authorities' growth: `is_loaded_as_not_existing() && original_info().is_empty()`) | Decide an applied authority's new-account state gas, its unit of state growth and the simulation's created count by EIP-161 emptiness (no account, or nonce zero, zero balance and no code), as the transaction's recipient (`revm:crates/handler/src/execution.rs:66`) and the deposit caller (`evm/execution.rs:1543`) already are; an authority whose leaf is in the state but empty is then charged and counted | QH-02 |
-| 12 | `SATIN-STATE-011`, `SATIN-SCHED-008` step 2, `SATIN-AUTH-008`, `SATIN-ACCT-014` | (b) | `evm2:ethereum/eip7702.rs:268` (`existed = account.exists() \|\| account.is_touched()`, `exists()` being a present overlay entry, `evm2:evm/state/account.rs:403–405`), charge at `evm2:ethereum/eip7702.rs:376–390`; `b:eip7702.rs:108` (simulation `absent`) and `:224` (applied growth from `existed`) | Decide the authority's charge, growth and simulated count by EIP-161 emptiness, as `b:tx.rs:124` (the transaction's recipient) and `b:tx.rs:555` (the deposit caller) already do | QH-02 |
-| 13 | `SATIN-SD-004` (slot row "non-zero / any"), `SATIN-SD-019` step 3 (latent) | (b) | `b:lib.rs:631–636` (every slot record of the destroyed account is collected, a slot whose original value is not zero included), `:668–673` and `:702–707` (all are taken back with their bytes and history); nothing at `:677–699` makes the record of a loaded slot still at its original value. (a) takes back only original-zero slots made non-zero and makes the record of an unchanged non-zero-original slot (`a:limit/record.rs:366–376`) | Take back only the records of slots whose original value is zero; leave a changed non-zero-original slot's record standing, and make the record of a loaded slot still holding a non-zero original at the deletion (KV +1, data size +40, 3,520 history gas on the destroying frame). Latent in block execution: a slot of the created address has a non-zero original only when it was loaded before the creation, which no instruction does there (an access list warms a slot without loading it, and no frame runs on the address's storage before its creation); a slot first accessed after the creation reads zero in both | none (the rule's own text) |
+| 11 | `SATIN-SD-004` (slot row "non-zero / any"), `SATIN-SD-019` step 3 (latent) | (b) | `b:lib.rs:631–636` (every slot record of the destroyed account is collected, a slot whose original value is not zero included), `:668–673` and `:702–707` (all are taken back with their bytes and history); nothing at `:677–699` makes the record of a loaded slot still at its original value. (a) takes back only original-zero slots made non-zero and makes the record of an unchanged non-zero-original slot (`a:limit/record.rs:366–376`) | Take back only the records of slots whose original value is zero; leave a changed non-zero-original slot's record standing, and make the record of a loaded slot still holding a non-zero original at the deletion (KV +1, data size +40, 3,520 history gas on the destroying frame). Latent in block execution: a slot of the created address has a non-zero original only when it was loaded before the creation, which no instruction does there (an access list warms a slot without loading it, and no frame runs on the address's storage before its creation); a slot first accessed after the creation reads zero in both | none (the rule's own text) |
 
 ## No change
 
