@@ -76,10 +76,10 @@ A price that reads the bucket again at each charge also lets a give-back return 
   | State charge | `PRE_FORK_COST` | `execution_charge` |
   | ------------ | --------------- | ------------------ |
   | Fresh storage slot, by `SSTORE` | `PRE_FORK_SSTORE_SET_COST` | `SSTORE_WRITE_COST` |
-  | New account, by a value `CALL` or `CALLCODE`, or by a `SELFDESTRUCT`'s beneficiary | `PRE_FORK_NEW_ACCOUNT_COST` | 0 |
+  | New account, by a value `CALL` or by a `SELFDESTRUCT`'s beneficiary | `PRE_FORK_NEW_ACCOUNT_COST` | 0 |
   | Created account, by `CREATE` or `CREATE2` | `PRE_FORK_CREATE_COST` | `CREATE_ACCESS` |
 
-  `PRE_FORK_COST` is a fixed pre-Satin price: it MUST NOT be scaled by the bucket multiplier and does not move when the schedule's prices do; `execution_charge` is the regular cost the schedule gives the same component ([Gas Schedule and Intrinsic Gas](gas-schedule.md)).
+  `PRE_FORK_COST` is a fixed pre-Satin price: it MUST NOT be scaled by the bucket multiplier and does not move when the schedule's prices do; `execution_charge` is the regular cost the schedule gives the component that creates the state ([Gas Schedule and Intrinsic Gas](gas-schedule.md)): the fresh slot's write and the creation's access, and nothing for a new account, a `SELFDESTRUCT`'s included, whose regular "new account" entry pays the beneficiary's account write and is not counted here.
   Every other state charge MUST have a legacy share of zero: deployed code, a delegation indicator, and every charge made before the first frame — the caller a deposit creates, an authorization's, the transaction's recipient or created account (`SATIN-POOL-024`) — as well as a keyless deployment's charges ([KeylessDeploy](../system-contracts/keyless-deploy.md)); a history charge has none.
   The legacy share is state gas: it is counted on the state ledger, given back with the rest of its charge, into a reservoir (`SATIN-HIST-012`), and a frame whose regular gas cannot pay it runs out of gas whatever its reservoir holds.
   For a value `CALL` the new-account charge, with its share, is made before the forward is computed (`SATIN-HIST-010`), so the share is not forwarded.
