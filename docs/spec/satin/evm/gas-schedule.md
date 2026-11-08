@@ -85,7 +85,7 @@ A charge that depends on state cannot be made correctly before the state is read
 
 ### Charges made at the start of execution
 
-- `SATIN-SCHED-008` The state-dependent parts of a transaction's cost MUST be charged at the start of its execution, before its first frame, as EIP-2780 and EIP-8037 specify, every state charge priced as [State Gas and SALT Pricing](state-gas.md) says and every new-account charge decided by the predicates of `SATIN-STATE-011` (an authority by existence, every other account by EIP-161 emptiness), in this order:
+- `SATIN-SCHED-008` The state-dependent parts of a transaction's cost MUST be charged at the start of its execution, before its first frame, as EIP-2780 and EIP-8037 specify, every state charge priced as [State Gas and SALT Pricing](state-gas.md) says, with no legacy share (`SATIN-POOL-024`), and every new-account charge decided by the predicates of `SATIN-STATE-011` (an authority by existence, every other account by EIP-161 emptiness), in this order:
   1. for a deposit, a Mega System Transaction executed as one included, whose caller is empty under EIP-161: the new-account state gas of that account, exactly once (`SATIN-DEP-003`, [Deposit Transactions](../block/deposits.md));
   2. for each authorization the list applies, in list order ([EIP-7702 Authorizations Before the First Frame](authorizations.md)): the new-account state gas of an authority the state holds no account for, then `ACCOUNT_WRITE` for the authority's first write, then the delegation indicator's state gas at most once per authority;
   3. the history gas of the write records made outside every frame: the applied authorities' records and the record of the first frame's start ([History Gas and the History Allowance](history-gas.md));
