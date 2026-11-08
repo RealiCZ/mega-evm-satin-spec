@@ -1,5 +1,5 @@
 ---
-description: Satin (unstable) — Deposit Transactions. Stub of the Satin specification: the rules this page will specify.
+description: Satin (unstable) — Deposit Transactions. What a deposit pays and is held to, the account a deposit creates for its caller, when a deposit becomes a failed deposit, and what a failed deposit keeps and reports.
 spec: Satin
 maturity: unstable
 ---
@@ -8,29 +8,88 @@ maturity: unstable
 
 {% hint style="warning" %}
 **Unstable** — Satin is under active development: everything on this page may change before Satin is frozen.
-This page is a stub. It lists what the page will specify; the specification text is written after the outline is reviewed.
 {% endhint %}
 
-Abstract: Deposits under Satin: what they pay and are held to, the account a deposit creates for its caller, when a deposit becomes a failed deposit and what a failed deposit keeps.
+Abstract: Deposit transactions under Satin: the history gas they do not pay and the pricing, limits and detention they are held to; the state gas of the caller account a deposit creates; the failed deposit — when a deposit becomes one, and what it applies, reports and keeps; and the prestates and envelopes that lie outside the specification.
+This page gathers the deposit rules; where the detail of a rule is another page's, it links it.
+
+## Motivation
+
+A deposit is derived from L1 and must be included in the block the derivation puts it in: a node cannot refuse it as it refuses a user's transaction.
+It pays no fee on L2, so whatever it consumes is paid by nobody on L2 — but it creates state and data the chain keeps, and it can run arbitrary code.
+A deposit that cannot be executed must still be recorded, and the record must say exactly what it changed and used, or a block of such deposits would grow state while reporting none, and two nodes would apply different effects for the same failed deposit.
 
 ## Specification
 
-The rules this page will specify, by their proposed ids:
+### What a deposit pays and is held to
 
-- `SATIN-DEP-001` — A deposit pays no history gas, its body, calldata and deposited code included.
-- `SATIN-DEP-002` — A deposit that is not system-originated is priced by bucket, held to every per-transaction limit and frame budget, and detained.
-- `SATIN-DEP-003` — A deposit-like transaction whose caller does not exist is charged that account's new-account state gas exactly once, before the first frame; the account is always created and kept and is one unit of state growth.
-- `SATIN-DEP-004` — A deposit that fails a validation check, cannot pay a charge made before its first frame, or whose own frame halts is a failed deposit: its sender's nonce is bumped, its mint credited, its whole gas limit (reservoir included) used, and nothing else applied.
-- `SATIN-DEP-005` — A failed deposit reports its whole gas limit as regular gas and no state or history gas on any ledger; its created caller carries no state gas and counts one unit of growth on the transaction and the block.
-- `SATIN-DEP-006` — A failed deposit keeps the data size of its body and of the hints it admitted, and returns no withheld gas, unspent gas or reservoir.
-- `SATIN-DEP-007` — A deposit that succeeds, reverts or is stopped by a limit settles as an ordinary transaction (a stop is a revert, not a failed deposit).
-- `SATIN-DEP-008` — A deposit from the live system address, and one handed to the node already carrying the promotion's source hash, is a failed deposit; a system deposit is refused under Regolith and fails.
-- `SATIN-DEP-009` — Where the floor binds, a deposit is charged nothing; only its receipt's and the block's figures move.
-- `SATIN-DEP-010` — A deposit creating from a sender whose nonce cannot be bumped (2^64 − 1) succeeds with nothing created and nothing counted.
-- `SATIN-DEP-011` — A failed deposit whose mint would overflow its sender's balance.
-- `SATIN-DEP-012` — Whether a deposit that fails before its first frame loads its recipient.
-- `SATIN-DEP-013` — A deposit carrying a gas price.
+- `SATIN-DEP-001` A deposit MUST pay no history gas: not for its body, its calldata, its logs, its write records, nor its deposited code (see [History Gas](../evm/history-gas.md)).
+- `SATIN-DEP-002` A deposit that is not system-originated (see [Mega System Transactions](../system-contracts/system-tx.md), `SATIN-MST-010`) MUST be priced by the SALT bucket its state lands in, MUST be held to every per-transaction limit and frame budget, and MUST be detained after a read of volatile data, as any transaction is.
+- `SATIN-DEP-003` A deposit — or a Mega System Transaction, which executes as one — whose caller account does not exist when the deposit is executed MUST be charged that account's new-account state gas exactly once, before its first frame, priced at the caller's bucket (at `m = 1` for a system-originated one).
+  The account MUST always be created and kept, whatever the deposit then does, and it MUST count as one unit of state growth; being one account, it cannot by itself cross the state-growth limit.
+- `SATIN-DEP-009` A deposit pays nothing for its gas.
+  Where the [EIP-7623](https://eips.ethereum.org/EIPS/eip-7623) floor binds a deposit's gas used (see [Two-Pool Gas](../evm/gas-model.md)), the deposit MUST be charged nothing more: only its receipt's gas used and the block's figures move.
+- `SATIN-DEP-007` A deposit whose own frame succeeds, reverts, or is stopped by a limit MUST settle as an ordinary transaction, as [Halts, Reverts and Stops](../evm/outcomes.md) specifies; a stop of its own frame is a revert, not a failed deposit.
+- `SATIN-DEP-010` A deposit that creates a contract from a sender whose nonce is `MAX_NONCE`, which cannot be bumped, MUST succeed with nothing created and nothing counted for the creation: no account at the address the creation would derive, no state gas for it, no record and no state growth, the gas of its first frame untouched.
+
+### The failed deposit
+
+- `SATIN-DEP-004` A deposit MUST become a failed deposit when it fails a validation check (see [Transaction Validation and Refusals](transaction-validation.md)), when it cannot pay a charge made before its first frame (the state gas of the caller account it creates, among them), or when its own frame halts — a first frame whose value the sender, its mint credited, cannot fund included.
+  A failed deposit MUST bump its sender's nonce, MUST credit its mint to its sender, MUST use its whole gas limit, the reservoir included, and MUST apply nothing else: every other change its execution made is taken back.
+- `SATIN-DEP-005` A failed deposit MUST report its whole gas limit as regular gas, and no state gas and no history gas, on the transaction's ledgers and on the block's.
+  The caller account it creates for a sender that did not exist carries no state gas, unlike the one a deposit that runs to a success or a revert creates, and it MUST still count as one unit of state growth, on the transaction's reported usage and on the block's counter.
+- `SATIN-DEP-006` A failed deposit MUST keep the data size of its body and of the Oracle hints it admitted (see [Oracle](../system-contracts/oracle.md)), and MUST return no withheld gas, no unspent gas and no reservoir to its sender.
+- `SATIN-DEP-008` A deposit whose caller is the live system address MUST be a failed deposit (see [Mega System Transactions](../system-contracts/system-tx.md), `SATIN-MST-003`), and so MUST one handed to the node already carrying the promotion's source hash from that address.
+  A deposit that carries the base layer's system-transaction flag, which the base layer refuses from Regolith on, MUST be a failed deposit too.
+- `SATIN-DEP-012` A deposit that fails before its first frame MUST load nothing of its recipient, nor of the account its creation would create; it MUST load its sender's code only once its intrinsic gas and floor checks have passed, so a deposit that fails one of them loads none of it.
+  What a deposit that fails loads otherwise is what [The Stateless Witness](stateless-witness.md) specifies for every transaction.
+
+### Outside the specification
+
+- `SATIN-DEP-011` A state in which a deposit's sender's balance plus the deposit's mint exceeds `MAX_BALANCE` when the deposit is executed is an invalid prestate: the execution of such a deposit, whether it would succeed or fail, lies outside this specification.
+- `SATIN-DEP-013` A deposit has no gas price: an envelope that presents itself as a deposit and carries a gas price is malformed, and its execution lies outside this specification.
+
+## Constants
+
+| Constant      | Value    | Description                                     |
+| ------------- | -------- | ----------------------------------------------- |
+| `MAX_NONCE`   | 2^64 − 1 | The largest account nonce ([EIP-2681](https://eips.ethereum.org/EIPS/eip-2681)) |
+| `MAX_BALANCE` | 2^256 − 1 | The largest account balance                    |
+
+## Rationale
+
+**Why does a deposit pay no history gas but state gas?**
+History gas prices the bytes a transaction appends to the chain's history at its sender's expense; a deposit's bytes are posted on L1 and paid there.
+The state a deposit adds is state every node keeps, so it is priced by the bucket it lands in, as any state is, though nobody on L2 pays the price: the charge bounds what one deposit can create with its gas limit.
+
+**Why is the created caller always kept and counted?**
+The base layer creates a deposit's sender when it bumps its nonce or mints to it, whatever the deposit then does.
+Counting it as state growth on every path keeps a block of failing deposits from growing state while reporting none; charging state gas for it only on the paths that run keeps a failed deposit's report one figure, its gas limit as regular gas.
+
+**Why does a failed deposit use its whole gas limit?**
+That is the base layer's rule for a failed deposit since Regolith; Satin keeps it, the reservoir included, so that a deposit that cannot run is accounted by its gas limit alone.
+
+**Why is a limit stop not a failed deposit?**
+A stop is a revert of the frame that crossed: the deposit ran, and its sender is accountable for what ran, exactly as for any other transaction.
+Only a halt, a validation failure, or a charge before the first frame it cannot pay makes a deposit fail.
+
+**Why is a mint that overflows the balance outside the specification?**
+No chain can reach it: all the ether in existence is about 1.2 × 10^26 wei, far below 2^256.
+The base layer's implementations disagree on it — saturating on success, a checked or a wrapping credit on failure — and defining one would bind every node to a behaviour no block can exercise.
+
+**Why does a deposit that fails early load nothing of its recipient?**
+The read set is part of what a stateless validator is given; a deposit refused before its first frame decides nothing on its recipient, so loading it would put an account in the witness that no execution reads.
+
+## Security Considerations
+
+- A node that does not count a failed deposit's created caller lets a block of such deposits exceed the block's state-growth budget while reporting no growth.
+- A node that returns unspent gas or reservoir for a failed deposit reports a gas used other nodes do not, and moves the block's cumulative gas.
+- A node that refuses a deposit, instead of including it as a failed deposit, cannot build the block the derivation requires.
+- A node that treats a stopped deposit as failed takes back the effects of what ran and keeps the mint only; the deposit's own frame's effects then differ from every other node's.
+- A node that loads a failed deposit's recipient adds an account to the witness the replay never reads; a validator holding the minimal witness then fails to reproduce the node's read set.
 
 ## Spec History
 
-- [Satin](../../upgrades/satin.md) — The reviewers' delta of Satin against Rex6.
+- [Rex5](../../upgrades/rex5.md) — Accounted a deposit caller's new account.
+- [Rex6](../../upgrades/rex6.md) — A deposit from the system address was refused with an error that left its block unexecutable.
+- [Satin](../../upgrades/satin.md) — No history gas for deposits, the created caller's state gas, the failed deposit's report, and a deposit from the system address included as a failed deposit.
