@@ -6,24 +6,24 @@ Line numbers are of those commits.
 
 | Counts | (a) | (b) |
 | --- | --- | --- |
-| Changes | 6 | 9 |
+| Changes | 3 | 12 |
 | Of which in both | 3 (`SATIN-BASE-005`, `SATIN-WIT-004`, `SATIN-ACT-010`) | 3 (the same) |
 
 ## Implementation (a)
 
 | Rule | Place | What must change |
 | --- | --- | --- |
-| `SATIN-MST-007` | `a:system/tx.rs:156` `originates_from_the_protocol` | A transaction is system-originated only when it is a Mega System Transaction (evm2's behaviour: (b) exempts only the promoted system transaction and its system calls). Drop the two other disjuncts — a caller equal to `0xff…fe` and a deposit carrying `MEGA_SYSTEM_TRANSACTION_SOURCE_HASH` — and mark the pre-block system calls as the protocol's own by another means than their caller. Reachable only outside a block (a simulation from `0xff…fe`, or a deposit handed over with the promotion's hash). |
-| `SATIN-MST-005` | `a:system/tx.rs:174`–`205` `validate_and_promote` (`validate_account_nonce_and_code` at `:199` with `eip3607_disabled`, `nonce_check_disabled`) | The nonce and EIP-3607 checks of a Mega System Transaction are made whatever the configuration says, as (b)'s `check_system_sender` (`b:tx.rs:225`) makes them. Reachable only with a configuration that turns the checks off (a simulation). |
-| `SATIN-KEY-005`/step-9 | `a:system/keyless/dispatch.rs:327` (`checks_code = !ctx.cfg().is_eip3607_disabled()`) | Step 9 is unconditional (QC-04 under the owner's general rule: (b) loads and refuses regardless, `b:keyless.rs` `run`). |
 | `SATIN-BASE-005` | `a:evm/host.rs:200`–`205` `slot_num` | `SLOTNUM` pushes zero (QA-05). The engine pushes the slot number its block environment carries; either the engine pushes zero, or every node supplies zero — the spec has no slot-number input any more (`SATIN-WIT-010`). |
-| `SATIN-WIT-004` | `a:evm/execution.rs:1430` `hold_authorization_list`; `a:limit/limit.rs:443` `authorization_list_may_cross` | No short-list fast path (QD-01 as the brief states it): the preflight simulation runs for every EIP-7702 list, loading every authority whose entry passes the chain-id, nonce and signature gates, so the witness holds them whether or not the list could cross a limit. |
+| `SATIN-WIT-004` | `a:evm/execution.rs:1430` `hold_authorization_list`; `a:limit/limit.rs:443` `authorization_list_may_cross` | No short-list fast path (QD-01 option 2): the preflight simulation runs for every EIP-7702 list, loading every authority whose entry passes the chain-id, nonce and signature gates, so the witness holds them whether or not the list could cross a limit. |
 | `SATIN-ACT-010`, `SATIN-BASE-006` | `a:block/executor.rs:193` `with_no_user_tx_activation_block`, `:199` `with_satin_activation_block` | The executor derives both flags itself from the chain configuration and the parent block's timestamp (QB-02 option 1) instead of taking them from its caller, defaulting to false. |
 
 ## Implementation (b)
 
 | Rule | Place | What must change |
 | --- | --- | --- |
+| `SATIN-KEY-005`/step-9, `SATIN-KEY-007` | `b:keyless.rs:227` (`acc.load_code()`), `:239` (`SignerHasCode()`) in `run` | With EIP-3607 disabled by the configuration, the signer is loaded without its code and step 9 checks nothing (QC-04 option 1, the draft); today the code is loaded and refused regardless. (a) conforms (`a:system/keyless/dispatch.rs:327`). |
+| `SATIN-MST-007` | `b:tx.rs:558` (`set_system_originated` only for a promoted system transaction), `b:ledger.rs:282` `begin_system_call` | A transaction whose caller is `0xff…fe`, of any type, and a deposit carrying `MEGA_SYSTEM_TRANSACTION_SOURCE_HASH` from any caller are system-originated too (the draft); (b) treats both as ordinary transactions. Reachable only outside a block. (a) conforms (`a:system/tx.rs:156` `originates_from_the_protocol`). |
+| `SATIN-MST-005` | `b:tx.rs:227` `check_system_sender` | The nonce and EIP-3607 checks of a Mega System Transaction follow the configuration switches a user transaction's follow; (b) makes them regardless. Reachable only with the switches off (a simulation). (a) conforms (`a:system/tx.rs:199`). |
 | `SATIN-ICPT-002` | `b:lib.rs:1080`–`1088` (`StartHooks::before`: `keyless::before`, `intercept::hint_before`, `intercept::answer_before`), ahead of evm2's depth check (`evm2:evm/mod.rs:1361` `execute_message_impl` → `dispatch_message`) | A call past the call-stack limit must not reach an interceptor or count a hint: gate the `before` hook's interceptors on `depth ≤ 1024`, answering `CallTooDeep` first, as (a) does (`a:evm/execution.rs:1518` `call_too_deep`). Unreachable under the execution cap (a frame at depth 1,024 has under one gas), so no observable difference today. |
 | `SATIN-ACT-005`, `SATIN-ACT-004`, `SATIN-PBLK-003` step 3, `SATIN-SYSC-003` | `b:block.rs:211` `apply_pre_execution_changes` ("no activation block: the predeploy check is not made") | Add the activation block's predeploy check of the six system contracts and the EIP-7997 factory, read-only, between the EIP-4788 call and the due-change read (QC-01 option 1). |
 | `SATIN-ACT-010`, `SATIN-BASE-006` | `b:block.rs:149`, `:166` (`only_deposits: false`) | Derive "admits only deposits" and "Satin activates" from the chain configuration and the parent's timestamp (QB-02 option 1); today the flag is a field defaulting to false and no activation flag exists. |
@@ -31,7 +31,7 @@ Line numbers are of those commits.
 | `SATIN-ACT-009` | `b:ledger.rs:35`–`47` `Cfg` (`limits`, `cap`, `oracle_cap`) | The per-transaction limits and the detention caps are fixed by the spec, not node-supplied (QC-02 option 1; the derived default is zero, not Satin's values). The block budgets are already fixed (`b:block.rs:35`). |
 | `SATIN-REG-002` | `b:ledger.rs:42` `Cfg::registry_slot`, read at `b:tx.rs:184` and `b:tx.rs:412` | The registry slot that holds the live system address is slot 0, fixed; not a configuration value. |
 | `SATIN-BASE-005` | `b:lib.rs:208` (`ins::slotnum`) | `SLOTNUM` pushes zero (QA-05); the instruction pushes the block environment's slot number. As for (a): the engine or every node fixes it at zero. |
-| `SATIN-WIT-004` | `b:eip7702.rs:194`–`198` (`simulate` only when `entries > kv_room \|\| entries > growth_room`) | No short-list fast path (QD-01 as the brief states it): simulate every list, loading every authority whose entry passes the chain-id, nonce and signature gates. |
+| `SATIN-WIT-004` | `b:eip7702.rs:194`–`198` (`simulate` only when `entries > kv_room \|\| entries > growth_room`) | No short-list fast path (QD-01 option 2): simulate every list, loading every authority whose entry passes the chain-id, nonce and signature gates. |
 | `SATIN-ACT-001`, `SATIN-ACT-002`, `SATIN-ACT-003` | none (b has no chain configuration, schedule or activation logic, QC-06) | The chain configuration key, the refused `satin…` keys and the base-fork check are part of the specification (QG-05 option 1); (b), or the node that embeds it, must implement them. |
 
 ## Noted, no change required

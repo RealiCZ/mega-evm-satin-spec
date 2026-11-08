@@ -76,7 +76,7 @@ interface IKeylessDeploy {
 | step-6 | `gasLimitOverride` (read as `MAX_UINT64` when larger) is at least the signed gas limit | `GasLimitTooLow(uint64,uint64)` |
 | step-7 | The signer can be recovered from the signature, whether its `s` value is low or high: EIP-2's bound on `s` does not apply | `InvalidSignature()` |
 | step-8 | The signer's nonce is at most 1 | `SignerNonceTooHigh(uint64)` |
-| step-9 | The signer's code is empty or an EIP-7702 delegation indicator | `SignerHasCode()` |
+| step-9 | Unless the node's configuration disables EIP-3607, the signer's code is empty or an EIP-7702 delegation indicator; with EIP-3607 disabled the step checks nothing | `SignerHasCode()` |
 | step-10 | If the signer's account is empty (EIP-161), charge the state gas of a new account at the signer's bucket | Out of gas |
 | step-11 | `min(gasLimitOverride, available gas)` is at least the signed gas limit | `GasLimitTooLow(uint64,uint64)` |
 | step-12 | The deploy address `keccak256(rlp([signer, 0]))[12:]` holds no code | `ContractAlreadyExists()` |
@@ -87,7 +87,8 @@ interface IKeylessDeploy {
   "Available gas" is the call's regular gas a `CREATE` could forward, its withheld part included (see [Gas Detention](../evm/gas-detention.md)).
   The state charges of steps 10 and 14 are made as every state charge is, the reservoir first and the rest spilling onto regular gas (see [Two-Pool Gas](../evm/gas-model.md)), priced as [State Gas and SALT Pricing](../evm/state-gas.md) specifies; the history charge of step 14 is priced as [History Gas](../evm/history-gas.md) specifies.
 - `SATIN-KEY-006` A call that more than one of steps 3 to 13 would refuse MUST be refused with the error of the first of them in the table's order.
-- `SATIN-KEY-007` The read of the signer's account that steps 8 to 10 and 13 check MUST load the account, with its code, into the transaction's state as an account access loads it, warm; the read of step 12 MUST load the deploy address's account warm, without its code.
+- `SATIN-KEY-007` The read of the signer's account that steps 8 to 10 and 13 check MUST load the account into the transaction's state as an account access loads it, warm: with its code, unless the node's configuration disables EIP-3607, in which case without it, so that a deployment with EIP-3607 disabled loads no signer code and makes no signer-code refusal.
+  The read of step 12 MUST load the deploy address's account warm, without its code.
   Neither read is charged, and no charge the call or its creation makes depends on either account's warmth: the creation loads both accounts again when it starts, as a creation loads its creator and the address it creates.
 - `SATIN-KEY-008` Step 12 MUST check the deploy address's code alone: an address that holds a nonce or a balance but no code passes it, and the creation then collides there, as any creation onto an occupied address does, and fails; the call answers `ExecutionHalted` with the creation's whole forward spent, and the signer's nonce is kept or taken back as `SATIN-KEY-013` says.
 - `SATIN-KEY-009` A creation at the deploy address whose constructor returns empty code MUST be refused its empty code deposit and MUST revert, its state, logs and records taken back as for a creation that reverted, so that the address stays deployable; the call answers `EmptyCodeDeployed`.
@@ -172,8 +173,9 @@ Whether initcode returns empty code depends on what it runs on — the forwarded
 They reported the sandbox's failures (a parent budget, a sandbox validation, the compute-gas limit, a failed read), none of which a native creation has.
 A failed read is a fault of the node, never an answer of a transaction.
 
-**Why is step 9 unconditional?**
-A node's configuration can switch EIP-3607 off for a user transaction in a simulation; the deployment is a protocol step whose result must not depend on that switch, so the signer is checked whatever the configuration says.
+**Why does step 9 follow the EIP-3607 switch?**
+The signer is the sender of the signed creation, and EIP-3607 is the rule that refuses a sender with code; a node's configuration can switch it off for a user transaction in a simulation, and the deployment follows the same switch, loading no signer code when it is off.
+Block execution never switches EIP-3607 off, so a block's deployments always make step 9.
 
 ## Security Considerations
 
