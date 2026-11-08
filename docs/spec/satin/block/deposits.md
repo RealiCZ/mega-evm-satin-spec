@@ -42,7 +42,7 @@ A deposit that cannot be executed must still be recorded, and the record must sa
 - `SATIN-DEP-006` A failed deposit MUST keep the data size of its body and of the Oracle hints it admitted (see [Oracle](../system-contracts/oracle.md)), and MUST return no withheld gas, no unspent gas and no reservoir to its sender.
 - `SATIN-DEP-008` A deposit whose caller is the live system address MUST be a failed deposit (see [Mega System Transactions](../system-contracts/system-tx.md), `SATIN-MST-003`), and so MUST one handed to the node already carrying the promotion's source hash from that address.
   A deposit that carries the base layer's system-transaction flag, which the base layer refuses from Regolith on, MUST be a failed deposit too.
-- `SATIN-DEP-012` A deposit that fails before its first frame MUST load nothing of its recipient, nor of the account its creation would create; it MUST load its sender's code only once its intrinsic gas and floor checks have passed, so a deposit that fails one of them loads none of it.
+- `SATIN-DEP-012` A deposit that fails before its first frame MUST make no load for its first frame's start: nothing of its recipient, nor of the account its creation would create, beyond what it loads in another role (its sender, when the recipient is the sender, is loaded all the same); it MUST load its sender's code only once its intrinsic gas and floor checks have passed, so a deposit that fails one of them loads none of it.
   What a deposit that fails loads otherwise is what [The Stateless Witness](stateless-witness.md) specifies for every transaction.
 
 ### Outside the specification

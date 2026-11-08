@@ -92,7 +92,7 @@ interface IKeylessDeploy {
   Neither read is charged, and no charge the call or its creation makes depends on either account's warmth: the creation loads both accounts again when it starts, as a creation loads its creator and the address it creates.
 - `SATIN-KEY-008` Step 12 MUST check the deploy address's code alone.
   An address that holds a nonce other than zero but no code passes it, and the creation then collides there, as any creation onto an address with a nonce does (`SATIN-SD-016`), and fails; the call answers `ExecutionHalted` with the creation's whole forward spent, and the signer's nonce is kept or taken back as `SATIN-KEY-013` says.
-  An address that holds only a balance — nonce zero and no code — passes it and is not a collision: the creation lands there, keeps that balance, and deploys as on an empty address.
+  An address that holds only a balance — nonce zero and no code — passes it and is not a collision: the creation lands there and keeps that balance; the address is not empty under EIP-161 (`SATIN-STATE-011`), so step 14 charges no created-account state gas for it and the creation counts no rise for it.
 - `SATIN-KEY-009` A creation at the deploy address whose constructor returns empty code MUST be refused its empty code deposit and MUST revert, its state, logs and records taken back as for a creation that reverted, so that the address stays deployable; the call answers `EmptyCodeDeployed`.
   A constructor that destroyed the account it was creating leaves no code either, and the call answers `EmptyCodeDeployed` for it too.
   The rule concerns the deploy address alone: a creation the constructor itself makes may return empty code.
