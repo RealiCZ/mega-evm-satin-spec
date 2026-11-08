@@ -1,6 +1,7 @@
 # Satin Specification — Questions for the Owner
 
-Everything the owner must decide before the specification text of the Satin section is written.
+Everything the owner had to decide before the specification text of the Satin section was written.
+Every item below carries the owner's **Decision** (8 November 2026), also listed in [decisions.md](decisions.md); [QG-07](#qg-07), added while the execution pages were written, is the one item still open.
 Each item gives its evidence, the options, a recommendation where the evidence supports one, and **Change needed**: which implementation would have to change under each option — (a) is mega-evm `5e3f30ad` (`crates/mega-evm/src/`, written `a:`), (b) is the `next/` workspace at mega-evm `785182eb` (`next/mega-evm2/src/`, written `b:`; `op:` for `next/op-evm2/src/`, `evm2:` for the evm2 fork at `91518705`).
 Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 **Outline** names the rules of [outline.md](outline.md) whose text waits on the answer.
@@ -13,8 +14,8 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 | (d) Both implementations agree, the draft says otherwise | 1 |
 | (e) Open points the cross-checks recorded | 3 |
 | (f) Layout | 9 |
-| (g) Writing policy | 6 |
-| Total | 37 |
+| (g) Writing policy | 7 |
+| Total | 38 |
 
 ## (a) Behaviour an implementation has that no source states
 
@@ -28,6 +29,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1), stated once on `satin/evm/outcomes.md` as out of scope.
 - Change needed: (1) none; (2) (a), and (b)'s EIP-7702 path; (3) (b).
 - Outline: `SATIN-OUT-017`.
+- **Decision**: (1): what a tracer or inspector is shown is outside the specification, stated once as `SATIN-OUT-017`. Reason: Tracing changes no outcome, gas figure, state or read set.
 
 ### QA-02
 
@@ -39,6 +41,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1).
 - Change needed: (1) none; (2) (a) for the `DUP` label (b's is the accurate one) and one side for the immediate label.
 - Outline: `SATIN-OUT-018`.
+- **Decision**: (1): the specification names no halt reason (`SATIN-OUT-018`). Reason: A halt's label is in no receipt and changes no state.
 
 ### QA-03
 
@@ -51,6 +54,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1), keeping the draft's order of Satin's own checks as normative since it names the error a pool reports.
 - Change needed: (1) none; (2) (a) or (b).
 - Outline: `SATIN-VAL-003`, `SATIN-VAL-007`.
+- **Decision**: (1): the specification fixes which transactions are refused, not which error names a transaction that fails several checks; the order of Satin's own checks stays normative. Reason: Only the refusal is consensus; the error a pool reports follows Satin's own order.
 
 ### QA-04
 
@@ -63,6 +67,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1) or (2), but in either case stated: two nodes hashing differently price differently.
 - Change needed: (b) makes the production hasher its default under either option.
 - Outline: `SATIN-STATE-010`.
+- **Decision**: (2): the bucket mapping is SALT's own definition, an input to the specification (`SATIN-STATE-010`); (b) makes SALT's production hasher its default. Reason: The mapping is SALT's, as the capacities are; two hashers price differently.
 
 ### QA-05
 
@@ -72,6 +77,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Options: (1) always zero on MegaETH; (2) a value derived from the block (for example from its timestamp), defined in the Satin section; (3) an input of the block, defined outside the specification.
 - Change needed: none in the engines under any option; the node and the derivation pipeline under (1) and (2).
 - Outline: `SATIN-BASE-005`, `SATIN-WIT-010`.
+- **Decision**: (1): `SLOTNUM` pushes zero, and stays a volatile read. Reason: MegaETH has no slot; the OP Stack hard-codes zero.
 
 ### QA-06
 
@@ -82,6 +88,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1); whether (a) keeps the knob is a code decision.
 - Change needed: none for (1); (a) for (2).
 - Outline: `SATIN-LIM-009`.
+- **Decision**: (1): no per-frame cap beyond the frame budgets (`SATIN-LIM-009`); (a)'s knob is an implementation detail. Reason: The knob is unlimited under Satin and specifies nothing.
 
 ### QA-07
 
@@ -92,6 +99,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (2), as the OP specification has it.
 - Change needed: none.
 - Outline: `SATIN-DEP-013`.
+- **Decision**: (2): a deposit envelope that carries a gas price is malformed and outside the specification. Reason: The OP specification has no deposit gas price.
 
 ### QA-08
 
@@ -103,6 +111,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1), since it costs one sentence and matches the deposit rule.
 - Change needed: (1) (b); (2) none.
 - Outline: `SATIN-LIM-015`, `SATIN-DEP-010`.
+- **Decision**: (1): a creation transaction whose sender's nonce cannot be bumped creates nothing (`SATIN-LIM-015`). Reason: One sentence, and it matches the deposit rule.
 
 ### QA-09
 
@@ -114,6 +123,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1).
 - Change needed: none.
 - Outline: `SATIN-PBLK-004`.
+- **Decision**: (1): the due-change predicate is stated at the storage level. Reason: The witness carries those slots.
 
 ### QA-10
 
@@ -126,6 +136,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1), with the call-depth priority rule rewritten for the revert-class stop and checked against both implementations.
 - Change needed: none known; phase 2 checks each rule against both.
 - Outline: `SATIN-SYSC-004`, `SATIN-ICPT-002`, `SATIN-ICPT-003`, `SATIN-HPTS-002`, `SATIN-MLC-001`.
+- **Decision**: (1): every Rex-era rule both implementations keep is restated as Satin's. Reason: A Satin page never relies on a Rex-era page.
 
 ## (b) The draft against implementation (a)
 
@@ -137,6 +148,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Options: (1) keep the rule and add the check to (a) (and to whichever implementation ships); (2) keep the rule as a node obligation outside the executor; (3) drop the rule, since every block before `satinTime` runs the legacy engine on Isthmus whatever the configuration says.
 - Change needed: (1) (a), and (b) if it ships; (2), (3) none.
 - Outline: `SATIN-ACT-003`.
+- **Decision**: (3): the schedule's second half-check is dropped from the specification. Reason: It is not the execution layer's job.
 
 ### QB-02
 
@@ -149,6 +161,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1): a validity rule should not depend on a flag a caller can forget.
 - Change needed: (1) (a) and (b); (2) none.
 - Outline: `SATIN-BASE-006`, `SATIN-ACT-004`, `SATIN-ACT-010`.
+- **Decision**: (1): the executor derives whether a block admits only deposits from the schedule and the parent timestamp. Reason: A validity rule must not depend on a flag a caller can forget.
 
 ## (c) The draft against implementation (b)
 
@@ -161,6 +174,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1): it is how Satin fails closed on a chain without the contracts.
 - Change needed: (1) (b); (2) (a).
 - Outline: `SATIN-PBLK-003`, `SATIN-ACT-005`, `SATIN-SYSC-003`.
+- **Decision**: (1): the activation block's predeploy check stays. Reason: It is how Satin fails closed on a chain without the contracts.
 
 ### QC-02
 
@@ -171,6 +185,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1).
 - Change needed: (1) (b) fixes the values in the engine; (2) (a).
 - Outline: `SATIN-LIM-001`, `SATIN-LIM-017`, `SATIN-DET-012`, `SATIN-DET-013`.
+- **Decision**: (1): the transaction limits, the frame share and the detention caps are protocol values (`SATIN-LIM-017`, `SATIN-DET-013`). Reason: A limit is part of block validity.
 
 ### QC-03
 
@@ -182,6 +197,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1).
 - Change needed: (1) (b); (2) (a).
 - Outline: `SATIN-DET-006`, `SATIN-DET-008`.
+- **Decision**: (1): a creation whose created address is the beneficiary is not detained from its start (`SATIN-DET-006`, `SATIN-DET-008`). Reason: A creation's loads are its own checks, not volatile reads.
 
 ### QC-04
 
@@ -191,6 +207,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Options: (1) keep the draft; (2) make step 9 unconditional.
 - Change needed: (1) (b); (2) (a).
 - Outline: `SATIN-KEY-005`.
+- **Decision**: (1): the draft is kept — with EIP-3607 disabled, step 9 of a keyless deployment neither loads the signer's code nor refuses it; (b) changes. Reason: A disabled EIP-3607 disables its check, here as for any sender.
 
 ### QC-05
 
@@ -201,6 +218,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1).
 - Change needed: (1) (b); (2) none.
 - Outline: `SATIN-PCMP-008`, `SATIN-DET-021`.
+- **Decision**: (1): a precompile address runs and is priced as the precompile whatever code it holds (`SATIN-PCMP-008`). Reason: Every node then dispatches the same call the same way.
 
 ### QC-06
 
@@ -210,6 +228,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Options: (1) the chain configuration is part of the specification (then (b) or its node needs it); (2) it is node documentation (QG-05).
 - Change needed: (1) (b); (2) none.
 - Outline: `SATIN-BASE-007`, `SATIN-ACT-002`.
+- **Decision**: (1), which QG-05's decision implies (the question has no recommendation of its own): the chain configuration's consensus parts are in the specification. Reason: The configuration key and schedule decide which blocks run Satin.
 
 ## (d) Both implementations agree, the draft says otherwise
 
@@ -222,6 +241,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Options: (1) the specification allows the fast path and states exactly which authorities it loads (and so which the witness holds); (2) both implementations make the full preflight.
 - Change needed: (1) none; (2) (a) and (b).
 - Outline: `SATIN-AUTH-003`, `SATIN-AUTH-005`, `SATIN-WIT-004`.
+- **Decision**: (2): every authority whose entry passes the chain-id, nonce and signature gates is loaded by the list simulation, for every list; no short-list fast path (`SATIN-AUTH-001`, `SATIN-AUTH-005`). Reason: The accounts a transaction loads, and so its witness, must not depend on the list's length or on where an out-of-gas falls.
 
 ## (e) Open points the cross-checks recorded
 
@@ -235,6 +255,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1).
 - Change needed: (1) none; (2) (a) and (b).
 - Outline: `SATIN-DET-023`, `SATIN-PCMP-007`.
+- **Decision**: Neither option: ModExp charges its formula price and then checks EIP-7823's bound, as evm2 upstream #874 and go-ethereum order it; an over-bound input is priced by its formula, not at zero or at 500 (`SATIN-PCMP-007`, `SATIN-DET-023`). Reason: The price detention reads is then the price the call is charged.
 
 ### QE-02
 
@@ -246,6 +267,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1): the read set is consensus for a stateless validator.
 - Change needed: none.
 - Outline: `SATIN-DEP-012`.
+- **Decision**: (1): a deposit that fails before its first frame loads nothing of its recipient. Reason: The read set is consensus for a stateless validator; both implementations agree.
 
 ### QE-03
 
@@ -256,6 +278,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1), stated in one sentence.
 - Change needed: (1) none; (2) (a) and (b); (3) none.
 - Outline: `SATIN-DEP-011`.
+- **Decision**: (3): a prestate in which a deposit's sender balance plus its mint exceeds 2^256 − 1 is invalid and outside the specification, for successful and failed deposits alike; no implementation changes. Reason: Unreachable: all ether is about 1.2 × 10^26 wei.
 
 ## (f) Layout
 
@@ -269,6 +292,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1).
 - Change needed: none.
 - Outline: `SATIN-ACT-001`.
+- **Decision**: (1): Satin succeeds Rex6; there is no Rex7. Reason: The state of `main` and of the draft.
 
 ### QF-02
 
@@ -277,6 +301,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Evidence: this repository puts it at `docs/spec/satin/` with `evm/`, `system-contracts/` and `block/` groups, file names matching the Rex pages they succeed, plus pages Rex has no counterpart for (`base-layer.md`, `state-gas.md`, `history-gas.md`, `authorizations.md`, `limit-stops.md`, `outcomes.md`, `transfer-logs.md`, and the six `block/` pages). The writing rules say how the section moves up when Satin is frozen (`docs/spec/AGENTS.md` "Sealing Satin").
 - Options: (1) as laid out; (2) another directory name, or a flat section.
 - Change needed: none.
+- **Decision**: (1): the section's place, groups and file names as laid out. Reason: As recommended.
 
 ### QF-03
 
@@ -285,6 +310,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Evidence: the writing rules require `<details>` blocks for unstable content, which cannot carry a whole standalone section; this repository uses frontmatter `spec: Satin` and `maturity: unstable` and a warning hint at the top of every Satin page instead (`docs/spec/AGENTS.md` "Maturity While Unstable").
 - Options: (1) as amended; (2) another frontmatter field or none, with the hint only.
 - Change needed: none.
+- **Decision**: (1): `spec: Satin`, `maturity: unstable` and a warning hint on every Satin page. Reason: A `<details>` block cannot carry a standalone section.
 
 ### QF-04
 
@@ -294,6 +320,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Options: (1) keep the draft frozen until the section is written, then rewrite it as the informative delta; (2) update it alongside each Satin page.
 - Recommendation: (1), so the section is written from one fixed source.
 - Change needed: none.
+- **Decision**: (1): the draft stays frozen until the section is written, then becomes the informative delta. Reason: The section is written from one fixed source.
 
 ### QF-05
 
@@ -302,6 +329,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Evidence: the draft links six glossary anchors `main`'s glossary lacks (`execution-cap`, `reservoir`, `state-gas`, `history-gas`, `write-record`, `history-allowance`); this repository adds short entries for them, marked unstable, with values checked against both implementations. #409's longer entries restate rules, which the glossary should not.
 - Options: (1) keep the short entries and add terms in phase 2 (limit stop, withheld gas, live system address, failed deposit, system-originated); (2) other wording.
 - Change needed: none.
+- **Decision**: (1): short glossary entries, more terms added as the section needs them. Reason: The glossary defines terms, not rules.
 
 ### QF-06
 
@@ -312,6 +340,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1).
 - Change needed: none.
 - Outline: `SATIN-ACT-008`.
+- **Decision**: (1): the backward-compatibility statements are reworded: a spec never changes earlier blocks, and contracts keep working. Reason: Contracts deployed under Rex6 run under Satin's prices.
 
 ### QF-07
 
@@ -321,6 +350,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Options: (1) name no Satin reference implementation until one is chosen; (2) name both as candidates.
 - Recommendation: (1).
 - Change needed: none.
+- **Decision**: (1): no Satin reference implementation is named. Reason: Two implementations exist and one will ship.
 
 ### QF-08
 
@@ -330,6 +360,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Options: (1) each rule has one home, and the gathering pages state the unified rule and link the detail; (2) the gathering pages restate the detail with the same ids.
 - Recommendation: (1), so a rule is never stated twice.
 - Change needed: none.
+- **Decision**: (1): each rule has one home; a gathering page states the unified rule and links the detail. Reason: A rule is never stated twice.
 
 ### QF-09
 
@@ -338,6 +369,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Evidence: [rule-ids.md](rule-ids.md) proposes `SATIN-<AREA>-<NNN>`, written as leading inline code, never renumbered, with the citation forms for tests and fixtures; the outline assigns 384 ids over 31 areas.
 - Options: (1) adopt as proposed; (2) adopt with other area codes or another placement; (3) no ids.
 - Change needed: none in phase 2; the implementations' tests cite ids afterwards.
+- **Decision**: (1): the rule-id scheme is adopted. Reason: Tests and fixtures cite rules by id.
 
 ## (g) Writing policy
 
@@ -351,6 +383,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1) for the rules a transaction's outcome depends on.
 - Change needed: none.
 - Outline: `SATIN-POOL-001`.
+- **Decision**: (1): every EIP-8037 rule a transaction's outcome depends on is restated, the EIP cited for provenance. Reason: The section is standalone.
 
 ### QG-02
 
@@ -360,6 +393,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Options: (1) pin each to a commit as EIP-8037 is, and check both forks against it; (2) restate their rules in the Satin section (QG-01 option 1), making the revision moot.
 - Change needed: (1) whichever fork differs from the pinned revision.
 - Outline: `SATIN-BASE-001`, `SATIN-BASE-004`, `SATIN-POOL-020`, `SATIN-SCHED-001`, `SATIN-SCHED-003`, `SATIN-LOG-001`, `SATIN-PCMP-003`.
+- **Decision**: (1): each EIP the section applies is pinned to a commit; the commits are an open item ([QG-07](questions.md#qg-07)). Reason: Draft EIPs keep changing.
 
 ### QG-03
 
@@ -369,6 +403,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Options: (1) write the current values, as the draft does; (2) write named constants only, with values once signed off.
 - Recommendation: (1); the warning hint already says values may change.
 - Change needed: none.
+- **Decision**: (1): the current values are written. Reason: The unstable hint already says values may change.
 
 ### QG-04
 
@@ -379,6 +414,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1).
 - Change needed: none.
 - Outline: `SATIN-DET-027`, `SATIN-ACT-009`.
+- **Decision**: (1): implementation-specific statements are restated as behaviour; the rest goes to node documentation. Reason: The specification describes behaviour, not code.
 
 ### QG-05
 
@@ -389,6 +425,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (1).
 - Change needed: none.
 - Outline: `SATIN-VAL-009`, `SATIN-ACT-002`.
+- **Decision**: (1): the node-integrator parts that decide consensus are in the specification; pool and RPC behaviour is node documentation. Reason: Only consensus belongs in the specification.
 
 ### QG-06
 
@@ -398,3 +435,16 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Options: (1) keep it as a recommendation in the Satin section; (2) move it to node documentation, the specification covering block execution only.
 - Change needed: none.
 - Outline: `SATIN-LIM-018`.
+- **Decision**: (2): executions outside a block are node documentation; `SATIN-LIM-018` is retired. Reason: The specification covers block execution and validation.
+
+### QG-07
+
+**The commits the EIP pins of QG-02 name.**
+
+- Evidence: QG-02 decided that each EIP the Satin section applies is pinned to a commit, as EIP-8037 is (`SATIN-POOL-001`). The sources this phase works from name no commit for EIP-8038, EIP-2780, EIP-7976, EIP-7981, EIP-7623, EIP-7708, EIP-7951, EIP-8024 or EIP-7843: implementation (a) follows the revisions its revm fork carries, and (b) those of its evm2 fork, whose comments cite the glamsterdam devnet-8 values and, for EIP-2780, pull request ethereum/EIPs#11844.
+  The values the section depends on are restated in full (the entry table of `SATIN-SCHED-003`, the floor and intrinsic rules, the transfer-log constants, the precompile prices), so the pins are provenance and do not change any rule's text.
+- Options: (1) the owner names the commit of each EIP, and each fork is checked against it; (2) the section pins each EIP at the commit current on a chosen date, looked up when the network is available.
+- Recommendation: (2), with the date of the EIP-8037 freeze point (18 September 2026).
+- Change needed: whichever fork differs from the pinned revision.
+- Outline: `SATIN-POOL-020`, `SATIN-SCHED-001`, `SATIN-LOG-001`, `SATIN-PCMP-003`; the block pages' `SATIN-BASE-001`, `SATIN-BASE-004`.
+- **Decision**: pending. Each rule's place carries a `pending owner decision` comment.
