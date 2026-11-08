@@ -50,7 +50,7 @@ A value transfer that triggers a `receive()` hook must also be able to emit an e
 - `SATIN-HIST-005` The records of the applied EIP-7702 authorities, and the record the transaction's own frame makes at its start (its value's recipient or its created account), MUST be charged before the first frame.
   A list the KV or state-growth limit skips has no authority records, and that history is not charged ([EIP-7702 Authorizations Before the First Frame](authorizations.md)).
   The authorities' records are the transaction's own: their history MUST be kept when the first frame fails or is stopped.
-  The first frame's record is that frame's: its history gas MUST come back, into the transaction's reservoir, when that frame fails or is stopped.
+  The first frame's record is that frame's: its history gas MUST come back, into the transaction's reservoir, when that frame reverts or is stopped; when that frame halts, the part the reservoir paid MUST return to the reservoir and the part regular gas paid MUST be consumed with the frame's regular gas.
   When the destruction table takes that record back inside a first frame that then succeeds, the charge has already come back with the table, and the settlement MUST NOT give it back a second time; when that first frame then fails, the table's give-back is discarded with the table, and the settlement MUST give the charge back once.
   A transaction that runs out of gas before its first frame keeps neither ([Gas Schedule and Intrinsic Gas](gas-schedule.md)).
 - `SATIN-HIST-006` A log, a storage write's record, and the records of a `SELFDESTRUCT` (the account it clears and its beneficiary) MUST be charged by the opcode once it completed.

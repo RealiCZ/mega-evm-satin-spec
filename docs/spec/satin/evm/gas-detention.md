@@ -44,7 +44,7 @@ Rex6 bounded it by lowering the transaction's limit on a separate compute-gas le
 
 ### Compute
 
-- `SATIN-DET-009` A transaction's compute MUST be every regular charge its frames make, whoever funds it: the running frame's regular gas spent, plus every suspended caller's, each less the regular gas it forwarded to its child, less the state and history gas its regular gas paid — a legacy share (`SATIN-STATE-012`) or a part the reservoir could not pay —, and less what halting frames burned (`SATIN-DET-011`).
+- `SATIN-DET-009` A transaction's compute MUST be every regular charge its frames make, whoever funds it: the running frame's regular gas spent, plus every suspended caller's, each less the regular gas it forwarded to its child, less the state and history gas its regular gas paid — a legacy share (`SATIN-STATE-012`) or a part the reservoir could not pay —, also when that charge is later given back into a reservoir by a take-back or a rollback, and less what halting frames burned (`SATIN-DET-011`).
 - `SATIN-DET-010` A value call's `CALL_STIPEND` is not forwarded gas: what the callee runs on it MUST count as compute, as the rest of what it runs does.
   The stipend MUST NOT lower compute either: when a value call returns, what the callee left of the stipend comes back to its caller with the rest of the callee's gas, and compute MUST NOT fall with the caller's spent regular gas.
   Compute can therefore exceed the transaction's regular ledger by the stipends of its value calls.

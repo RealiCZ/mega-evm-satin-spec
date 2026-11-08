@@ -55,7 +55,7 @@ If it is given back carelessly, a destruction can give back what another transac
 - `SATIN-SD-009` The give-back MUST follow the give-back rule of `SATIN-HIST-012`, into the destroying frame's reservoir, and is a give-back of state or history gas, as a slot written back to zero is, not an EIP-3529 refund.
   It MUST be credited with the completed write, after every charge the opcode makes: a charge the frame cannot pay halts the opcode first, and the give-back is not credited.
   It MUST NOT raise the destroying frame's remaining in any dimension above the budget the frame was given (`SATIN-LIM-004`).
-- `SATIN-SD-010` When the destroying frame succeeds, the give-back is unspent gas of that frame and returns up the chain with it.
+- `SATIN-SD-010` When the destroying frame succeeds, the give-back is reservoir of that frame and returns up the chain with its reservoir (`SATIN-POOL-012`).
   When the destroying frame fails, or a frame containing it fails, the mark and every effect of the table MUST be discarded: the charges stand, or come back by the ordinary rule for that failure, and a record the table took back stands again; the discarded give-back is not a further one.
 
 ### The marked account
@@ -82,7 +82,7 @@ If it is given back carelessly, a destruction can give back what another transac
   That rise MUST be held to the limits only after the operation's give-back, which cannot cross a limit.
   A frame exactly at its state-growth budget that destroys an account created in the transaction, with N new slots, while moving a non-zero balance to a new beneficiary, subtracts `1 + N` when the leaf was absent at the transaction's start and N when it was present, before it adds the beneficiary.
 - `SATIN-SD-019` A `SELFDESTRUCT` MUST proceed in this order:
-  1. its charges: its regular gas, at which compute is decided — a regular charge that crosses gas detention stops the frame there, and the operation applies none of the table and no beneficiary ([Gas Detention](gas-detention.md)) — and the new-account state gas of a beneficiary it creates, its legacy share first; a charge the frame cannot pay halts the opcode before anything below;
+  1. its charges: its regular gas, at which compute is decided — a regular charge that crosses gas detention stops the frame there, and the operation applies none of the table and no beneficiary ([Gas Detention](gas-detention.md)) — and the new-account state gas of a beneficiary it creates, its legacy share first (16,000 at the current prices, `SATIN-STATE-012`); a charge the frame cannot pay halts the opcode before anything below;
   2. the table's give-back: the state-growth falls, the state-gas refills, the write records, and the deployed code's data size and history gas;
   3. its positive effects, held in the dimension order data size, KV updates, state growth (`SATIN-LIM-010`): the records it makes — the account it clears, when that account was not created in the transaction and this write makes its record; a loaded pre-existing slot of an account the table covers, when the deletion makes that slot's record; and its beneficiary — and its transfer log, then the beneficiary's state growth;
   4. the history of the records it makes (`SATIN-HIST-013`).

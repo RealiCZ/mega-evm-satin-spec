@@ -106,7 +106,7 @@ Home: [State Gas and SALT Pricing](evm/state-gas.md)
 | [`SATIN-STATE-009`](evm/state-gas.md) | A system-originated transaction and a system call (Mega System Transactions and the Protocol's Own Transactions) MUST be priced at `m = 1` and MUST NOT read a bucket capacity. |
 | [`SATIN-STATE-010`](evm/state-gas.md) | The SALT bucket an account or a storage slot lands in MUST be the bucket SALT's own definition assigns to its key: the mapping from an account or a slot to its bucket is an input to this specification, as the bucket … |
 | [`SATIN-STATE-011`](evm/state-gas.md) | Every new-account and created-account charge of `SATIN-STATE-004`, and the state-growth rise that goes with it (Resource Accounting), MUST be decided, when the charge is decided, by one of two predicates: |
-| [`SATIN-STATE-012`](evm/state-gas.md) | A state charge an opcode makes for one of the following MUST take its legacy share from the frame's regular gas before the reservoir pays any of it, and the rest as every state charge is paid (`SATIN-POOL-008`): |
+| [`SATIN-STATE-012`](evm/state-gas.md) | A state charge an opcode or a keyless deployment makes for one of the following MUST take its legacy share from the frame's regular gas before the reservoir pays any of it, and the rest as every state charge is paid … |
 
 ## History Gas and the History Allowance
 
@@ -267,7 +267,7 @@ Home: [SELFDESTRUCT and the Destruction Table](evm/selfdestruct.md)
 | [`SATIN-SD-007`](evm/selfdestruct.md) | A write record the table takes back MUST return its data size to the destroying frame's budget and its history gas into the destroying frame's reservoir, and the KV count falls by that record. |
 | [`SATIN-SD-008`](evm/selfdestruct.md) | Deployed code is neither a write record nor a unit of state growth; code on the absent-then-present row MUST return its data size and its history gas as a record taken back does. |
 | [`SATIN-SD-009`](evm/selfdestruct.md) | The give-back MUST follow the give-back rule of `SATIN-HIST-012`, into the destroying frame's reservoir, and is a give-back of state or history gas, as a slot written back to zero is, not an EIP-3529 refund. |
-| [`SATIN-SD-010`](evm/selfdestruct.md) | When the destroying frame succeeds, the give-back is unspent gas of that frame and returns up the chain with it. |
+| [`SATIN-SD-010`](evm/selfdestruct.md) | When the destroying frame succeeds, the give-back is reservoir of that frame and returns up the chain with its reservoir (`SATIN-POOL-012`). |
 | [`SATIN-SD-011`](evm/selfdestruct.md) | A later `SELFDESTRUCT` of the same account while the mark stands MUST apply the table for nothing: it subtracts nothing, refills nothing and takes nothing back. |
 | [`SATIN-SD-012`](evm/selfdestruct.md) | A `SELFDESTRUCT` of an account that was not created in the transaction MUST NOT apply the destruction table and MUST NOT mark the account: it subtracts nothing, refills nothing and takes nothing back, and EIP-6780 does … |
 | [`SATIN-SD-013`](evm/selfdestruct.md) | From the first effective destruction until the end of the transaction, while the mark stands, the account MUST add nothing further to state growth and keep no further state gas: an `SSTORE` of one of its slots neither … |
@@ -479,7 +479,7 @@ Home: [KeylessDeploy](system-contracts/keyless-deploy.md)
 | [`SATIN-KEY-012`](system-contracts/keyless-deploy.md) | The signer's nonce record, and the signer's unit of state growth when the creation's nonce bump creates the signer's account, MUST be counted on the call when the creation has returned, once the nonce rule below has … |
 | [`SATIN-KEY-013`](system-contracts/keyless-deploy.md) | The signer's nonce: |
 | [`SATIN-KEY-014`](system-contracts/keyless-deploy.md) | Unless a limit stopped it (`SATIN-KEY-016`), the call MUST succeed and return `(gasUsed, deployedAddress, errorData)`: |
-| [`SATIN-KEY-015`](system-contracts/keyless-deploy.md) | `gasUsed` MUST be what the creation spent from both pools, without intrinsic gas and before the EIP-3529 refund: the regular gas it spent plus the state and history gas it kept, net of every give-back within the … |
+| [`SATIN-KEY-015`](system-contracts/keyless-deploy.md) | `gasUsed` MUST be what the creation spent from both pools taken together, without intrinsic gas and before the EIP-3529 refund: the regular gas and the reservoir the creation was given, less the regular gas and the … |
 | [`SATIN-KEY-016`](system-contracts/keyless-deploy.md) | A limit the creation crosses — its frame budget in data size, KV updates or state growth, the transaction's limit in one of those dimensions, or gas detention's compute limit, at the creation's start or in its initcode … |
 | [`SATIN-KEY-017`](system-contracts/keyless-deploy.md) | The node MUST NOT produce the errors `ParentBudgetExceeded(uint8,uint64,uint64)`, `InvalidTransaction()`, `InsufficientComputeGas(uint64,uint64)` or `InternalError()`, which the interface no longer declares: a database … |
 | [`SATIN-KEY-018`](system-contracts/keyless-deploy.md) | A call that carries value MUST first be held to gas detention for step 1's charge: when that charge is the crossing, the call is stopped with `MegaLimitExceeded(2, limit)` and none of it is billed; otherwise the charge … |

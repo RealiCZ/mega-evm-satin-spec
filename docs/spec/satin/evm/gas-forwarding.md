@@ -81,6 +81,7 @@ They agree on most values and differ only at small remainders; both are specifie
 ## Security Considerations
 
 - If a node forwarded more than `forwarded_gas_cap`, enough regular gas would survive at deep call depth to sustain a call-depth denial-of-service at MegaETH's block gas limits.
+- A contract ported from Ethereum that infers a starved call from the gas it has left after the call — `gasleft() < gasInitial / 64`, or `< gasRequested / 63` — never takes that branch on MegaETH: a caller keeps 2/100 of its regular gas at a call, more than EIP-150's 1/64, so the check treats every starved call as a logic error; this has held since MiniRex, and Satin's give-back rule neither causes nor cures it ([Two-Pool Gas](gas-model.md)).
 - If the stipend were taken from the caller's remaining gas, or added before the cap, a value call's caller would keep less than the rule allows, or a caller could forward more than the cap.
 - If the reservoir share were bounded by the gas argument, a callee with a hard-coded gas argument could not pay for the state it creates, and a contract written for one gas pool would fail calls its pool could pay.
 - If a system call kept its whole reservoir from its children, a pre-block call's callee could not pay the state gas of the slots it writes.
