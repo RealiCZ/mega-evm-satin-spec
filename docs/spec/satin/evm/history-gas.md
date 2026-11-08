@@ -41,7 +41,7 @@ A value transfer that triggers a `receive()` hook must also be able to emit an e
 - `SATIN-HIST-003` `TX_BODY_SIZE` MUST be `TX_BASE_SIZE` for the envelope plus `TX_FIXED_WRITE_RECORDS` write records of `WRITE_RECORD_SIZE` bytes: the sender's account, and the settlement writes of the four accounts a transaction's fees are credited to (the block beneficiary, the L1 fee vault, the base fee vault and the operator fee vault).
   It is an upper bound, charged whether or not every fee account is written.
   It covers every account write to the sender, and of the fee accounts only the fee credits; a storage write to the sender's slots, and a write execution makes to a fee account that is not the sender, are records of their own ([Resource Accounting](resource-accounting.md)).
-  The five fixed records are bytes of the body alone: they MUST count as data size and pay history gas with the body, and MUST NOT count as KV updates, so a transaction that keeps no write of its own reports zero KV updates and its own frame starts with the whole `TX_KV_UPDATE_LIMIT` ([Resource Accounting](resource-accounting.md)).
+  The five fixed records are bytes of the body alone: they MUST count as data size and pay history gas with the body, and MUST NOT count as KV updates, so a transaction that keeps no write of its own reports zero KV updates, and the body takes nothing of the transaction's KV-update limit ([Resource Accounting](resource-accounting.md)).
 
 ### When each charge is made
 
