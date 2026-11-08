@@ -207,7 +207,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Options: (1) keep the draft; (2) make step 9 unconditional.
 - Change needed: (1) (b); (2) (a).
 - Outline: `SATIN-KEY-005`.
-- **Decision**: (2), by the general rule: step 9 of a keyless deployment is checked whether or not EIP-3607 is disabled. Reason: Satin follows (b), which checks it unconditionally.
+- **Decision**: (1): the draft is kept — with EIP-3607 disabled, step 9 of a keyless deployment neither loads the signer's code nor refuses it; (b) changes. Reason: A disabled EIP-3607 disables its check, here as for any sender.
 
 ### QC-05
 
@@ -228,7 +228,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Options: (1) the chain configuration is part of the specification (then (b) or its node needs it); (2) it is node documentation (QG-05).
 - Change needed: (1) (b); (2) none.
 - Outline: `SATIN-BASE-007`, `SATIN-ACT-002`.
-- **Decision**: (1), through QG-05: the chain configuration's consensus parts are in the specification. Reason: The configuration key and schedule decide which blocks run Satin.
+- **Decision**: (1), which QG-05's decision implies (the question has no recommendation of its own): the chain configuration's consensus parts are in the specification. Reason: The configuration key and schedule decide which blocks run Satin.
 
 ## (d) Both implementations agree, the draft says otherwise
 

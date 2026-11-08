@@ -3,9 +3,10 @@
 The owner's answers to the questions of [questions.md](questions.md), decided on 8 November 2026, as the Satin section is written from them.
 Each line gives the question, the decision, and the reason in one line; where a decision changes an implementation, the change is listed in [changes-evm.md](changes-evm.md) for the execution pages and in the block pages' own list for the rest.
 
-## The general rule
+## The rule for the QE items
 
-Where the two implementations differ, Satin follows the behaviour of implementation (b), the engine on evm2; an implementation that differs from the decision changes.
+Among the QE items, where the two implementations differ, Satin follows the behaviour of evm2 — implementation (b) and evm2 upstream — and implementation (a) changes where it differs.
+This rule covers the QE items only; every other question follows its recommendation unless the table says otherwise.
 
 ## The decisions
 
@@ -26,9 +27,9 @@ Where the two implementations differ, Satin follows the behaviour of implementat
 | [QC-01](questions.md#qc-01) | (1): the activation block's predeploy check stays | It is how Satin fails closed on a chain without the contracts |
 | [QC-02](questions.md#qc-02) | (1): the transaction limits, the frame share and the detention caps are protocol values (`SATIN-LIM-017`, `SATIN-DET-013`) | A limit is part of block validity |
 | [QC-03](questions.md#qc-03) | (1): a creation whose created address is the beneficiary is not detained from its start (`SATIN-DET-006`, `SATIN-DET-008`) | A creation's loads are its own checks, not volatile reads |
-| [QC-04](questions.md#qc-04) | (2), by the general rule: step 9 of a keyless deployment is checked whether or not EIP-3607 is disabled | Satin follows (b), which checks it unconditionally |
+| [QC-04](questions.md#qc-04) | (1): the draft is kept — with EIP-3607 disabled, step 9 of a keyless deployment neither loads the signer's code nor refuses it; (b) changes | A disabled EIP-3607 disables its check, here as for any sender |
 | [QC-05](questions.md#qc-05) | (1): a precompile address runs and is priced as the precompile whatever code it holds (`SATIN-PCMP-008`) | Every node then dispatches the same call the same way |
-| [QC-06](questions.md#qc-06) | (1), through QG-05: the chain configuration's consensus parts are in the specification | The configuration key and schedule decide which blocks run Satin |
+| [QC-06](questions.md#qc-06) | (1), which QG-05's decision implies (the question has no recommendation of its own): the chain configuration's consensus parts are in the specification | The configuration key and schedule decide which blocks run Satin |
 | [QD-01](questions.md#qd-01) | (2): every authority whose entry passes the chain-id, nonce and signature gates is loaded by the list simulation, for every list; no short-list fast path (`SATIN-AUTH-001`, `SATIN-AUTH-005`) | The accounts a transaction loads, and so its witness, must not depend on the list's length or on where an out-of-gas falls |
 | [QE-01](questions.md#qe-01) | Neither option: ModExp charges its formula price and then checks EIP-7823's bound, as evm2 upstream #874 and go-ethereum order it; an over-bound input is priced by its formula, not at zero or at 500 (`SATIN-PCMP-007`, `SATIN-DET-023`) | The price detention reads is then the price the call is charged |
 | [QE-02](questions.md#qe-02) | (1): a deposit that fails before its first frame loads nothing of its recipient | The read set is consensus for a stateless validator; both implementations agree |
