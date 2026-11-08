@@ -81,7 +81,7 @@ A charge that depends on state cannot be made correctly before the state is read
 - `SATIN-SCHED-005` The floor's base MUST be the transaction's own decomposed base of `SATIN-SCHED-006` without its calldata, access-list, authorization and initcode costs: `TX_BASE_COST` for a transaction to its sender, `TX_BASE_COST + COLD_ACCOUNT_ACCESS` for a call to another account without value, `TX_BASE_COST + COLD_ACCOUNT_ACCESS + TX_VALUE_COST` for one with value, and `TX_BASE_COST + CREATE_ACCESS` for a creation.
   The floor MUST be that base plus `TOTAL_COST_FLOOR_PER_TOKEN × FLOOR_TOKENS_PER_BYTE` gas for every calldata byte, zero or non-zero, a creation's initcode included, and the same for every access-list byte, `ACCESS_LIST_ADDRESS_SIZE` bytes for an address and `ACCESS_LIST_SLOT_SIZE` for a storage key.
   How the floor sets the gas used is `SATIN-POOL-018` and `SATIN-POOL-020` ([Two-Pool Gas](gas-model.md)); how validation holds the gas limit to it is on [Transaction Validation and Refusals](../block/transaction-validation.md).
-- `SATIN-SCHED-007` The `PER_AUTH_BASE_COST` of every authorization entry MUST be charged by the transaction's validation, as every intrinsic entry is, whether or not the authorization will apply; an authority that already exists MUST be refunded nothing when its authorization is applied.
+- `SATIN-SCHED-007` The `PER_AUTH_BASE_COST` of every authorization entry MUST be charged by the transaction's validation, as every intrinsic entry is, whether or not the authorization will apply; an authority MUST be refunded nothing when its authorization is applied, whether or not it is empty under EIP-161.
 
 ### Charges made at the start of execution
 

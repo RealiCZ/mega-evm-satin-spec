@@ -124,13 +124,13 @@ Rex pages it draws on: `evm/dual-gas-model.md`, `evm/compute-gas.md`.
 
 ### Gas Schedule and Intrinsic Gas (`satin/evm/gas-schedule.md`)
 
-The Amsterdam gas schedule Satin runs with its two changes, the EIP-2780 intrinsic cost, the charges made before the first frame, the code-deposit charge order and the addresses warm from the start of a transaction.
+The Amsterdam gas schedule Satin runs with its three changes, the EIP-2780 intrinsic cost, the charges made before the first frame, the code-deposit charge order and the addresses warm from the start of a transaction.
 
 Rex pages it draws on: `evm/dual-gas-model.md`, `evm/compute-gas.md`.
 
 | Id | Rule | Draft | Rex page | Code (a) | Code (b) | Note |
 | --- | --- | --- | --- | --- | --- | --- |
-| `SATIN-SCHED-001` | The gas schedule is Amsterdam's (EIP-8038's state-access prices, EIP-2780's intrinsic decomposition, EIP-7976's calldata floor, EIP-7981's access-list floor) with two changes: the EIP-8037 state-gas entries rebuilt at the cost per state byte, and deposited code's history gas at one history byte | `satin.md §5` L262–L267 | replaces evm/dual-gas-model.md (Prague schedule) | `a:evm/schedule.rs` `satin_gas_params` | `b:lib.rs` `satin_version` | undefined: QG-02 |
+| `SATIN-SCHED-001` | The gas schedule is Amsterdam's (EIP-8038's state-access prices, EIP-2780's intrinsic decomposition, EIP-7976's calldata floor, EIP-7981's access-list floor) with three changes: the EIP-8037 state-gas entries rebuilt at the cost per state byte, deposited code's history gas at one history byte, and the 98/100 forwarding reduction in place of 63/64 | `satin.md §5` L262–L267 | replaces evm/dual-gas-model.md (Prague schedule) | `a:evm/schedule.rs` `satin_gas_params` | `b:lib.rs` `satin_version` | undefined: QG-02 |
 | `SATIN-SCHED-002` | Every opcode's static gas is Amsterdam's: EXTCODESIZE and EXTCODECOPY pay 200, EIP-8038's two warm accesses | `satin.md §5` L270 | new | `a:evm/schedule.rs` | `evm2:version/gas_params.rs` |  |
 | `SATIN-SCHED-003` | The regular-gas entries that differ from Osaka, each with its value (the entry table) | `satin.md §5` L268–L269, L272–L309 | new | `a:evm/schedule.rs` `satin_gas_params` | `b:lib.rs` `satin_version`<br>`evm2:version/gas_params.rs` | undefined: QG-02 |
 | `SATIN-SCHED-004` | A cold SSTORE pays 2,100 for its access with its static cost (EIP-8038 folds the warm base into a cold slot's access) | `satin.md §5` L310–L311 | new | `a:evm/schedule.rs` | `evm2:version/gas_params.rs` |  |
