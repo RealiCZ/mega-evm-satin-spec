@@ -34,7 +34,7 @@ For a transaction the stop applies to:
 
 - `SATIN-STOP-004` The frame that crosses a limit MUST revert with `MegaLimitExceeded(uint8 kind, uint64 limit)` as its output, ABI-encoded as a Solidity custom error.
   The write or the charge that crossed MUST NOT be kept or made, and every write and log the frame made MUST be reverted, as a `REVERT` reverts them.
-- `SATIN-STOP-005` Its caller MUST resume as after any revert: the call fails, its return data is the stop's revert data, and the gas the frame had MUST return to the caller — for gas detention's limit, the gas it had before the charge that crossed — its reservoir included ([Two-Pool Gas](gas-model.md)).
+- `SATIN-STOP-005` Its caller MUST resume as after any revert: the call fails, its return data is the stop's revert data, and the frame's regular gas MUST return to the caller — for gas detention's limit, the gas it had before the charge that crossed — with its reservoir, after the rollback of `SATIN-POOL-014` ([Two-Pool Gas](gas-model.md)).
 - `SATIN-STOP-006` What the frame counted MUST be discarded with it, so the caller resumes within every limit, with one exception.
   A failed frame's discard puts back what the frames above it kept when it started, a record of theirs it took back included, while an Oracle hint it admitted stays counted (`SATIN-STOP-012`); a hint sent into room such a take-back freed leaves the transaction over its data-size limit once the frame fails.
   The frame it returns into MUST then return the stop of the transaction's data-size limit before it runs another instruction, whether the frame below reverted, halted or was itself stopped.

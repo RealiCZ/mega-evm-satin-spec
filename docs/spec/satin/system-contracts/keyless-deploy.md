@@ -62,7 +62,7 @@ interface IKeylessDeploy {
 ### The steps
 
 - `SATIN-KEY-004` A deployment MUST make the charges and checks of the table below.
-  A step's refusal MUST revert the call with the error the table names: the state and history gas the call was charged MUST be given back, and the regular gas it spent stays spent.
+  A step's refusal MUST revert the call with the error the table names: the state and history gas the call was charged MUST be given back into the call's reservoir, never its regular gas (`SATIN-HIST-012`), and the regular gas it spent stays spent.
   A step that cannot pay its charge MUST halt the call out of gas, consuming the call's regular gas.
 - `SATIN-KEY-005` The steps, in this order:
 
@@ -81,11 +81,11 @@ interface IKeylessDeploy {
 | step-11 | `min(gasLimitOverride, available gas)` is at least the signed gas limit | `GasLimitTooLow(uint64,uint64)` |
 | step-12 | The deploy address `keccak256(rlp([signer, 0]))[12:]` holds no code | `ContractAlreadyExists()` |
 | step-13 | The signer's balance is at least the carried value | `InsufficientBalance()` |
-| step-14 | Charge what a `CREATE` charges its frame for the start: `CREATE_GAS` plus EIP-3860's initcode cost of regular gas; the state gas of the created account at the deploy address's bucket if the deploy address is empty; the history gas of the created account's write record, unless the transaction changed the deploy address's account already; and the history gas of the signer's nonce record, unless the transaction changed the signer's account already, the transaction's sender among such accounts | Out of gas |
+| step-14 | Charge what a `CREATE` charges its frame for the start: `CREATE_GAS` plus EIP-3860's initcode cost of regular gas; the state gas of the created account at the deploy address's bucket if the deploy address is empty, with no legacy share; the history gas of the created account's write record, unless the transaction changed the deploy address's account already; and the history gas of the signer's nonce record, unless the transaction changed the signer's account already, the transaction's sender among such accounts | Out of gas |
 | step-15 | `min(gasLimitOverride, available gas)` is still at least the signed gas limit | `GasLimitTooLow(uint64,uint64)` |
 
   "Available gas" is the call's regular gas a `CREATE` could forward, its withheld part included (see [Gas Detention](../evm/gas-detention.md)).
-  The state charges of steps 10 and 14 are made as every state charge is, the reservoir first and the rest spilling onto regular gas (see [Two-Pool Gas](../evm/gas-model.md)), priced as [State Gas and SALT Pricing](../evm/state-gas.md) specifies; the history charge of step 14 is priced as [History Gas](../evm/history-gas.md) specifies.
+  The state charges of steps 10 and 14 are made as every state charge is, the reservoir first and the rest from regular gas (see [Two-Pool Gas](../evm/gas-model.md)), with no legacy share (`SATIN-STATE-012`), priced as [State Gas and SALT Pricing](../evm/state-gas.md) specifies; the history charge of step 14 is priced as [History Gas](../evm/history-gas.md) specifies.
 - `SATIN-KEY-006` A call that more than one of steps 3 to 13 would refuse MUST be refused with the error of the first of them in the table's order, and a call that step 3 refuses for more than one reason with the first error in step 3's own order: a carried transaction with `to` set and a chain id is refused with `NotContractCreation()`.
 - `SATIN-KEY-007` The read of the signer's account that steps 8 to 10 and 13 check MUST load the account into the transaction's state as an account access loads it, warm: with its code, unless the node's configuration disables EIP-3607, in which case without it, so that a deployment with EIP-3607 disabled loads no signer code and makes no signer-code refusal.
   The read of step 12 MUST load the deploy address's account warm, without its code.
@@ -112,8 +112,8 @@ interface IKeylessDeploy {
   - a deployment from signer nonce 1 MUST take the bump back, setting the nonce to 1, when the creation's bump is the last change of the signer's nonce the deployment made, whether the deployment succeeded or failed;
   - a signer whose own code spent a nonce during the creation, a change that survives the creation, MUST keep every bump.
 
-  The signer's write record MUST be counted after that rule: when the nonce set back leaves the signer's account as the transaction loaded it, no record stands, and the history gas step 14 charged for it MUST be given back; a signer's account another write changed — value a creation that returned without a revert or a halt moved out of it, or into it — keeps its record.
-  When the signer's nonce stands where it was and step 10 charged state gas for the signer's account, that state gas MUST be given back.
+  The signer's write record MUST be counted after that rule: when the nonce set back leaves the signer's account as the transaction loaded it, no record stands, and the history gas step 14 charged for it MUST be given back into the call's reservoir; a signer's account another write changed — value a creation that returned without a revert or a halt moved out of it, or into it — keeps its record.
+  When the signer's nonce stands where it was and step 10 charged state gas for the signer's account, that state gas MUST be given back into the call's reservoir.
   No execution reaches that last case: step 10 charges only a signer empty under EIP-161, whose nonce is zero, and once steps 11 to 15 have passed the creation always bumps that nonce, which a deployment from nonce zero keeps; the sentence gives the case an answer, and no test can reach it.
 
 ### The answer

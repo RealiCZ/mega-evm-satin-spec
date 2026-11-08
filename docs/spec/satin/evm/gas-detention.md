@@ -44,11 +44,11 @@ Rex6 bounded it by lowering the transaction's limit on a separate compute-gas le
 
 ### Compute
 
-- `SATIN-DET-009` A transaction's compute MUST be every regular charge its frames make, whoever funds it: the running frame's regular gas spent, plus every suspended caller's, each less the regular gas it forwarded to its child, less the state and history gas that spilled onto its regular gas, and less what halting frames burned (`SATIN-DET-011`).
+- `SATIN-DET-009` A transaction's compute MUST be every regular charge its frames make, whoever funds it: the running frame's regular gas spent, plus every suspended caller's, each less the regular gas it forwarded to its child, less the state and history gas its regular gas paid — a legacy share (`SATIN-STATE-012`) or a part the reservoir could not pay —, and less what halting frames burned (`SATIN-DET-011`).
 - `SATIN-DET-010` A value call's `CALL_STIPEND` is not forwarded gas: what the callee runs on it MUST count as compute, as the rest of what it runs does.
   The stipend MUST NOT lower compute either: when a value call returns, what the callee left of the stipend comes back to its caller with the rest of the callee's gas, and compute MUST NOT fall with the caller's spent regular gas.
   Compute can therefore exceed the transaction's regular ledger by the stipends of its value calls.
-- `SATIN-DET-011` What a halting frame burns — the regular gas it had left when it halted — MUST NOT count as compute, whatever it could not pay: a dynamic charge, an opcode's static gas, a cold access, or state or history gas that spilled past the reservoir.
+- `SATIN-DET-011` What a halting frame burns — the regular gas it had left when it halted — MUST NOT count as compute, whatever it could not pay: a dynamic charge, an opcode's static gas, a cold access, or state or history gas its regular gas had to pay.
   A precompile that runs out of gas MUST count nothing of its forward as compute: it burns the forward, a value call's stipend included, unless it is the crossing (`SATIN-DET-021`), and then the forward returns to its caller.
 
 ### The limit
@@ -64,12 +64,12 @@ Rex6 bounded it by lowering the transaction's limit on a separate compute-gas le
 ### Withheld gas
 
 - `SATIN-DET-014` Once a limit is set, every frame's regular gas MUST be split into a spendable part, held at what the limit leaves the transaction (`limit − compute`, or zero once compute has reached the limit), and a withheld part, the rest of the frame's regular gas.
-  The split MUST be applied when the read's opcode completes, when a frame starts or resumes, and after an `SSTORE`, whose restore of a slot can give regular gas back.
+  The split MUST be applied when the read's opcode completes and when a frame starts or resumes; no give-back raises a frame's regular gas within the frame (`SATIN-HIST-012`), so nothing else can move it.
 - `SATIN-DET-015` Only a regular charge MUST be limited to the spendable part.
   Every other reader of the frame's gas MUST see both parts: `GAS`, the forward of [Gas Forwarding](gas-forwarding.md) and the clamp of an explicit call gas, the `SSTORE` minimum-gas check, the checks that decide whether a cold load is attempted, the gas a child returns, and the settlement at the end of the transaction.
 - `SATIN-DET-016` At the settlement the withheld part MUST be unspent gas: it returns to the sender with the rest of the unspent gas, and it is not part of the gas used that caps the EIP-3529 refund.
   A failed deposit returns none of it, as it returns no unspent gas and no reservoir ([Deposit Transactions](../block/deposits.md)).
-- `SATIN-DET-017` A forward and a spill of state or history gas MUST draw the withheld part first.
+- `SATIN-DET-017` A forward, and the part of a state or history charge that regular gas pays — its legacy share, and what the reservoir cannot pay — MUST draw the withheld part first.
 
 A transaction that read volatile data therefore runs exactly as it would without the read until a regular charge needs the withheld part.
 
@@ -97,7 +97,7 @@ A transaction that read volatile data therefore runs exactly as it would without
 
 ### Interceptor answers
 
-- `SATIN-DET-025` A system contract's intercepted answer ([Call Interception](../system-contracts/interception.md)) that spent more regular gas than the frame's allowance, state and history gas that spilled onto its regular gas not counted, MUST be the crossing.
+- `SATIN-DET-025` A system contract's intercepted answer ([Call Interception](../system-contracts/interception.md)) that spent more regular gas than the frame's allowance, state and history gas its regular gas paid not counted, MUST be the crossing.
   The answer's whole regular spend MUST be treated as the one charge that crossed: none of it is billed, the part within the allowance included, so the stop's compute is the transaction's compute when the frame started.
 
 ### Exemptions and scope

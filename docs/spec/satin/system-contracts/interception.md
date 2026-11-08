@@ -57,7 +57,7 @@ KeylessDeploy has none either: its `keylessDeploy` call is recognized by the rul
 - `SATIN-ICPT-004` An interceptor's answer MUST return to the caller as the result of a frame that ran on the gas the call forwarded: the call opcode's own charges, made before the call reached the interceptor, stay charged; the answer itself charges nothing unless its contract's page says otherwise; the forwarded regular gas returns to the caller untouched, and the reservoir share the caller gave the call returns to it by the child-merge rule of [Two-Pool Gas](../evm/gas-model.md).
   A successful answer's output is the method's ABI-encoded return value; a refusal's is the error's ABI encoding, returned with a revert.
   An answer writes no account, no storage and no log, and moves no value.
-- `SATIN-ICPT-005` Under [gas detention](../evm/gas-detention.md), an answer whose regular spend exceeds the calling frame's allowance — state and history gas that spilled onto regular gas not counted — MUST be the crossing: the answer's whole regular spend is treated as the one charge that crossed, none of it billed, the part within the allowance included, and the call is stopped as [Limit Stops](../evm/limit-stops.md) specifies, with the effect the answer would have made not made.
+- `SATIN-ICPT-005` Under [gas detention](../evm/gas-detention.md), an answer whose regular spend exceeds the calling frame's allowance — state and history gas that regular gas paid not counted — MUST be the crossing: the answer's whole regular spend is treated as the one charge that crossed, none of it billed, the part within the allowance included, and the call is stopped as [Limit Stops](../evm/limit-stops.md) specifies, with the effect the answer would have made not made.
 
 ## Constants
 

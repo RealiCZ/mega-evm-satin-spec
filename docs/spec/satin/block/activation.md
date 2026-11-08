@@ -26,7 +26,8 @@ A node that started the spec at another block, ran it on a chain without those c
   A node MUST execute every block whose timestamp is at or after `satinTime` under Satin, and every earlier block under the spec its timestamp resolves to.
   The block in which Satin activates is the block whose timestamp is at or after `satinTime` and whose parent's timestamp is before it (see [Base Layer](../base-layer.md), `SATIN-BASE-007`).
 - `SATIN-ACT-008` Satin MUST NOT change how a block before `satinTime` executes: a node replaying history MUST resolve each block's spec from its timestamp and apply that spec's rules.
-  From `satinTime` on, every account, contract and slot the earlier blocks left MUST be executed under Satin's rules: contracts deployed under an earlier spec keep working, under Satin's prices, pools and limits.
+  From `satinTime` on, every account, contract and slot the earlier blocks left MUST be executed under Satin's rules: accounts, code and storage carry over unchanged and run under Satin's prices, pools and limits.
+  A contract deployed under an earlier spec is not promised the outcome it had under that spec for the same gas: a gas budget fixed for Rex prices — a gas argument, a stored per-call limit, a signed gas limit — can be too small under Satin's prices, by about five times for a call that creates state and has no reservoir ([Two-Pool Gas](../evm/gas-model.md), [State Gas and SALT Pricing](../evm/state-gas.md)).
 
 ### The chain configuration
 
@@ -96,8 +97,10 @@ A chain reaches Satin through the Rex-era forks, which installed the six system 
 Checking that they are there, once, fails closed on a chain that did not run those forks, without rewriting state a chain that did run them holds.
 A chain must therefore have run a Rex6 block before `satinTime`.
 
-**Why is the backward-compatibility statement "keep working"?**
-Satin changes nothing about earlier blocks, but a contract deployed under Rex6 runs, from `satinTime`, under Satin's prices, pools, `GAS` value and transfer logs: it keeps working, it does not behave identically.
+**Why does the compatibility statement promise the state carries over, and not that contracts behave the same?**
+Satin changes nothing about earlier blocks, and every account, its code and its storage carry over; but a contract deployed under Rex6 runs, from `satinTime`, under Satin's prices, pools, `GAS` value and transfer logs, so it does not behave identically.
+What a Rex-era contract can rely on is kept where Satin can keep it: no give-back of state or history gas raises a frame's regular gas, so gas a contract spent does not come back while the transaction runs, as under Rex6, and the legacy share keeps a slot, an account or a creation at least its pre-Satin price in regular gas.
+What it cannot rely on is any gas budget fixed for Rex prices: creating state without a reservoir costs regular gas about five times Rex6's at multiplier 1 — a cold fresh slot 113,540 against 22,100 — and more at a higher multiplier, so such a budget has to be derived again for Satin.
 
 **Why fix the configuration in the spec?**
 A node that let its configuration override a price, a limit or a check would compute another chain from the same blocks; fixing them makes the spec, not the node, the source of every value a Satin block depends on.

@@ -15,8 +15,8 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 | (e) Open points the cross-checks recorded | 3 |
 | (f) Layout | 9 |
 | (g) Writing policy | 7 |
-| (h) Raised by the review of the written section | 2 |
-| Total | 40 |
+| (h) Raised by the review of the written section | 3 |
+| Total | 41 |
 
 ## (a) Behaviour an implementation has that no source states
 
@@ -466,7 +466,7 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 
 ## (h) Raised by the review of the written section
 
-Two questions the review of the Satin section raised, where both implementations agree with each other and the text said otherwise; (a) is mega-evm `5e3f30ad`, (b) the `next/` workspace at mega-evm `d04e8f80` on the evm2 fork at `8751da2b`.
+Three questions the review of the Satin section raised — the first two where both implementations agree with each other and the text said otherwise, the third from an analysis of EIP-8037's give-backs against Rex-era contracts; (a) is mega-evm `5e3f30ad`, (b) the `next/` workspace at mega-evm `d04e8f80` on the evm2 fork at `8751da2b`.
 
 ### QH-01
 
@@ -493,3 +493,16 @@ Two questions the review of the Satin section raised, where both implementations
 - Recommendation: (1).
 - Change needed: (1) both implementations' authority predicate; (2) (a) and (b) at every other site; (A) none.
 - **Decision**: (1) on 9 November 2026, amended the same day to (A): two predicates, stated once as `SATIN-STATE-011`. An EIP-7702 authority is new when the state holds no account at its address — leaf existence, as Rex6, both implementations, upstream and Ethereum's Amsterdam specification decide it — for its new-account state gas and its unit of state growth (`SATIN-SCHED-008` step 2, `SATIN-AUTH-008`, `SATIN-ACCT-014`). Every other new-account charge and state-growth rise uses EIP-161 emptiness — no account, or nonce zero, zero balance and no code: a deposit's or Mega System Transaction's caller (`SATIN-DEP-003`, `SATIN-DEP-005`, `SATIN-SCHED-008` step 1), a value call's recipient and a creation's address (`SATIN-HIST-010`, `SATIN-HIST-011`, `SATIN-POOL-015`), a transaction's value recipient (`SATIN-SCHED-008` step 4), a `SELFDESTRUCT`'s beneficiary (`SATIN-SD-018`) and a keyless signer. `SATIN-ACCT-015` gains the matching exception; `SATIN-WIT-017` stays: the witness still answers no account as no account and an empty leaf as a leaf. No implementation changes.
+
+### QH-03
+
+**Whether a give-back of state or history gas may return to a frame's regular gas.**
+
+- Evidence: the text follows EIP-8037 at the pinned commit `dbc6d457cb`: a give-back credits the frame's regular gas first, up to the state and history gas its regular gas paid (the frame's outstanding spill, `SATIN-HIST-012` before this decision), a child's returned reservoir unwinds the caller's spill (`SATIN-POOL-012`), and a revert returns the spilled part to regular gas (`SATIN-POOL-014`); both implementations do this ((a) the revm fork's `cfg/gas.rs` `refill_reservoir`, `refill_history`, `rollback_state_gas`; (b) evm2's `interpreter/gas.rs` the same three).
+  On MegaETH a transaction at or below the 200,000,000 execution cap has no reservoir, so every state and history charge is paid from regular gas and every give-back returns there: a lock slot set before a call and cleared after it raises `GAS` by 101,440 at `m = 1` (395,200 at `m = 4`), and an intermediary that writes, logs or creates state and then bubbles a deeper failure with `REVERT` returns all of it to its caller (a 10 KiB log alone 903,936).
+  A Rex-era contract that records a failure after a failed call only when it holds more gas than a starved call could leave it was safe under Rex6, where storage gas never came back, and is not under the pinned rule; with a reservoir the sender adds (a gas limit above the cap, about 0.0002 ETH of balance), a fresh slot in such a handler costs 12,100 of regular gas against Rex6's 22,100.
+  ethereum/EIPs#12581 (open, head `2ba9176f` when read) proposes for EIP-8037 that refills and rollbacks credit the reservoir only, with a legacy share that takes the pre-fork cost of a slot, an account or a creation from `gas_left` first.
+- Options: (i) keep the pinned rule and document the hazards; (ii) take #12581's rule: give-backs credit the reservoir only, with the legacy share; (iii) partial rules (history only; give-backs deferred to the settlement; the legacy share alone); (iv) follow whatever EIP-8037 ends with.
+- Recommendation: (ii).
+- Change needed: (i) none; (ii) both implementations' gas trackers and the four state-charge sites; (iii) and (iv) as each one says.
+- **Decision**: (ii), with the flat legacy share, on 9 November 2026, stated in Satin's own words with #12581 as provenance. Every give-back of state or history gas — a refill (a slot written back, an account returned, a record taken back), the destruction table's, a start's charge given back, a failed frame's rollback — credits the reservoir of the frame that makes it, never its regular gas (`SATIN-HIST-012`); a call returns at most the child's unused regular gas, plus its reservoir (`SATIN-POOL-012`); an exceptional halt keeps today's rule: what regular gas paid is consumed with it, and the reservoir returns to what the frame received (`SATIN-POOL-014`). A state charge an opcode makes for a new slot, a new account or a creation's account takes first from regular gas `min(state_charge, max(0, PRE_FORK_COST − execution_charge))`, `PRE_FORK_COST` the fixed pre-Satin price — 20,000 for a new slot, 25,000 for a new account, 32,000 for a creation, 10,000 / 25,000 / 20,000 of regular gas with the current prices — flat, not scaled by the multiplier; no share for code deposit, the delegation indicator or history gas; for a call, the new-account charge with its share is taken before the forward (`SATIN-STATE-012`). QH-01 keeps its form and now decides only whose reservoir holds a give-back. The receipt, the ledgers and the block accounting are unchanged. Accepted costs: a slot set and cleared without a reservoir keeps its charge out of regular gas until the transaction ends; a failed call's state still funds a handler's state through the reservoir; both implementations change ([changes-evm.md](changes-evm.md) rows 12 and 13).

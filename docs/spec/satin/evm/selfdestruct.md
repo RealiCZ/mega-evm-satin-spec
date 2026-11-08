@@ -44,15 +44,15 @@ If it is given back carelessly, a destruction can give back what another transac
   | Slot          | non-zero                   | any      | Nothing of the refill or the fall; the write record of a slot the transaction loaded stands, and the deletion makes it when that slot still holds its original value; a slot the transaction did not load has no record |
 
   Every part is deleted with the account.
-- `SATIN-SD-005` A refill MUST be the price that part was charged — its schedule entry times the bucket multiplier of that charge ([State Gas and SALT Pricing](state-gas.md)) — and MUST go to the destroying frame, also when another frame paid it.
+- `SATIN-SD-005` A refill MUST be the price that part was charged — its schedule entry times the bucket multiplier of that charge ([State Gas and SALT Pricing](state-gas.md)), its legacy share included — and MUST go into the reservoir of the destroying frame, never its regular gas, also when another frame paid it (`SATIN-HIST-012`).
   On the absent-leaf row the leaf's charge is the one this transaction made for that leaf: at the value transfer that funded the address, at a `SELFDESTRUCT` that paid it, at the transaction's own value, or at the creation when the created address was empty.
 - `SATIN-SD-006` State growth MUST fall for the absent leaf and for each slot on the zero-then-non-zero row, and for nothing else in the table.
   The fall of the absent leaf stands also when the creation itself added no rise, as when the transaction funded the address and then created onto it.
   An address that held a balance before the transaction is on the present-leaf row: the creation adds no rise for that leaf, the destruction subtracts none, and the write record the nonce bump made stands.
-- `SATIN-SD-007` A write record the table takes back MUST return its data size to the destroying frame's budget and its history gas to the destroying frame, and the KV count falls by that record.
+- `SATIN-SD-007` A write record the table takes back MUST return its data size to the destroying frame's budget and its history gas into the destroying frame's reservoir, and the KV count falls by that record.
   When the destroying frame is the transaction's own frame and that frame succeeds, this return is the record's history gas once, and the settlement MUST NOT give that charge back again (`SATIN-HIST-005`).
 - `SATIN-SD-008` Deployed code is neither a write record nor a unit of state growth; code on the absent-then-present row MUST return its data size and its history gas as a record taken back does.
-- `SATIN-SD-009` The give-back MUST follow the refill order of `SATIN-HIST-012` and is a give-back of state or history gas, as a slot written back to zero is, not an EIP-3529 refund.
+- `SATIN-SD-009` The give-back MUST follow the give-back rule of `SATIN-HIST-012`, into the destroying frame's reservoir, and is a give-back of state or history gas, as a slot written back to zero is, not an EIP-3529 refund.
   It MUST be credited with the completed write, after every charge the opcode makes: a charge the frame cannot pay halts the opcode first, and the give-back is not credited.
   It MUST NOT raise the destroying frame's remaining in any dimension above the budget the frame was given (`SATIN-LIM-004`).
 - `SATIN-SD-010` When the destroying frame succeeds, the give-back is unspent gas of that frame and returns up the chain with it.
@@ -78,11 +78,11 @@ If it is given back carelessly, a destruction can give back what another transac
 
 ### The beneficiary and the order of a destruction
 
-- `SATIN-SD-018` A `SELFDESTRUCT` that moves a non-zero balance to a distinct account empty under EIP-161 (`SATIN-STATE-011`) MUST be a rise of state growth and MUST be charged new-account state gas ([State Gas and SALT Pricing](state-gas.md)), a repeated destruction included; a zero balance creates no account and is not a rise.
+- `SATIN-SD-018` A `SELFDESTRUCT` that moves a non-zero balance to a distinct account empty under EIP-161 (`SATIN-STATE-011`) MUST be a rise of state growth and MUST be charged new-account state gas, with its legacy share ([State Gas and SALT Pricing](state-gas.md), `SATIN-STATE-012`), a repeated destruction included; a zero balance creates no account and is not a rise.
   That rise MUST be held to the limits only after the operation's give-back, which cannot cross a limit.
   A frame exactly at its state-growth budget that destroys an account created in the transaction, with N new slots, while moving a non-zero balance to a new beneficiary, subtracts `1 + N` when the leaf was absent at the transaction's start and N when it was present, before it adds the beneficiary.
 - `SATIN-SD-019` A `SELFDESTRUCT` MUST proceed in this order:
-  1. its charges: its regular gas, at which compute is decided — a regular charge that crosses gas detention stops the frame there, and the operation applies none of the table and no beneficiary ([Gas Detention](gas-detention.md)) — and the new-account state gas of a beneficiary it creates; a charge the frame cannot pay halts the opcode before anything below;
+  1. its charges: its regular gas, at which compute is decided — a regular charge that crosses gas detention stops the frame there, and the operation applies none of the table and no beneficiary ([Gas Detention](gas-detention.md)) — and the new-account state gas of a beneficiary it creates, its legacy share first; a charge the frame cannot pay halts the opcode before anything below;
   2. the table's give-back: the state-growth falls, the state-gas refills, the write records, and the deployed code's data size and history gas;
   3. its positive effects, held in the dimension order data size, KV updates, state growth (`SATIN-LIM-010`): the records it makes — the account it clears, when that account was not created in the transaction and this write makes its record; a loaded pre-existing slot of an account the table covers, when the deletion makes that slot's record; and its beneficiary — and its transfer log, then the beneficiary's state growth;
   4. the history of the records it makes (`SATIN-HIST-013`).

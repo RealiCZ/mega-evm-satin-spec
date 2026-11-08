@@ -81,7 +81,7 @@ See [Two-Pool Gas](satin/evm/gas-model.md).
 
 ## Reservoir
 
-_(Satin, unstable)_ The EIP-8037 state-gas reservoir: the part of a transaction's gas limit above the [execution cap](#execution-cap), which pays [state gas](#state-gas) and [history gas](#history-gas) before they spill onto regular gas.
+_(Satin, unstable)_ The EIP-8037 state-gas reservoir: the part of a transaction's gas limit above the [execution cap](#execution-cap), which pays [state gas](#state-gas) and [history gas](#history-gas) before regular gas pays the rest, and into which every give-back of them is credited.
 A child frame receives a share of what its caller has left of it.
 
 See [Two-Pool Gas](satin/evm/gas-model.md).

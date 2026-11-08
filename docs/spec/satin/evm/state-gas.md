@@ -59,10 +59,32 @@ A price that reads the bucket again at each charge also lets a give-back return 
   At a site decided by emptiness, an account whose leaf is in the state but is empty under EIP-161 is charged and counted as an absent one.
   Apart from an authority's charge, the distinction between no account and an empty leaf is made only by the witness ([The Stateless Witness](../block/stateless-witness.md)) and by the destruction table ([SELFDESTRUCT and the Destruction Table](selfdestruct.md)).
 - `SATIN-STATE-008` The only `SSTORE` that charges fresh-slot state gas MUST be one whose original value in the transaction is zero, whose present value is zero, and whose new value is not zero.
-  The only `SSTORE` that gives it back MUST be one whose original value is zero, whose present value is not zero, and whose new value is zero, unless the slot's account is marked for deletion ([SELFDESTRUCT and the Destruction Table](selfdestruct.md)); the give-back MUST be the price the slot was charged, credited to the frame running that `SSTORE` whichever frame paid the charge, in the refill order of [History Gas and the History Allowance](history-gas.md) (`SATIN-HIST-007`).
+  The only `SSTORE` that gives it back MUST be one whose original value is zero, whose present value is not zero, and whose new value is zero, unless the slot's account is marked for deletion ([SELFDESTRUCT and the Destruction Table](selfdestruct.md)); the give-back MUST be the price the slot was charged, its legacy share included, credited to the reservoir of the frame running that `SSTORE` whichever frame paid the charge, never to regular gas ([History Gas and the History Allowance](history-gas.md), `SATIN-HIST-007`, `SATIN-HIST-012`).
   Every other `SSTORE` transition MUST charge no fresh-slot state gas and give none back.
   These are the same transitions as the state-growth change of an `SSTORE` ([Resource Accounting](resource-accounting.md)).
 - The first effective `SELFDESTRUCT` of an account created in the same transaction gives back the state gas of each part the destruction table names; that rule is `SATIN-SD-005` ([SELFDESTRUCT and the Destruction Table](selfdestruct.md)).
+
+### The legacy share
+
+- `SATIN-STATE-012` A state charge an opcode makes for one of the following MUST take its legacy share from the frame's regular gas before the reservoir pays any of it, and the rest as every state charge is paid (`SATIN-POOL-008`):
+
+  `legacy_share = min(state_charge, max(0, PRE_FORK_COST − execution_charge))`
+
+  - `state_charge` — the state charge, `entry × m` (`SATIN-STATE-001`).
+  - `PRE_FORK_COST` and `execution_charge` — by the component that creates the state:
+
+  | State charge | `PRE_FORK_COST` | `execution_charge` |
+  | ------------ | --------------- | ------------------ |
+  | Fresh storage slot, by `SSTORE` | `PRE_FORK_SSTORE_SET_COST` | `SSTORE_WRITE_COST` |
+  | New account, by a value `CALL` or `CALLCODE`, or by a `SELFDESTRUCT`'s beneficiary | `PRE_FORK_NEW_ACCOUNT_COST` | 0 |
+  | Created account, by `CREATE` or `CREATE2` | `PRE_FORK_CREATE_COST` | `CREATE_ACCESS` |
+
+  `PRE_FORK_COST` is a fixed pre-Satin price: it MUST NOT be scaled by the bucket multiplier and does not move when the schedule's prices do; `execution_charge` is the regular cost the schedule gives the same component ([Gas Schedule and Intrinsic Gas](gas-schedule.md)).
+  Every other state charge MUST have a legacy share of zero: deployed code, a delegation indicator, and every charge made before the first frame — the caller a deposit creates, an authorization's, the transaction's recipient or created account (`SATIN-POOL-024`) — as well as a keyless deployment's charges ([KeylessDeploy](../system-contracts/keyless-deploy.md)); a history charge has none.
+  The legacy share is state gas: it is counted on the state ledger, given back with the rest of its charge, into a reservoir (`SATIN-HIST-012`), and a frame whose regular gas cannot pay it runs out of gas whatever its reservoir holds.
+  For a value `CALL` the new-account charge, with its share, is made before the forward is computed (`SATIN-HIST-010`), so the share is not forwarded.
+
+  With the schedule's current prices the shares are 10,000 for a fresh slot (20,000 − 10,000), 25,000 for a new account (25,000 − 0) and 20,000 for a created account (32,000 − 12,000), at every multiplier: a cold fresh slot written with a reservoir takes 22,100 of regular gas (2,100 access, 10,000 write, 10,000 share) and the rest of its 97,920 × `m` from the reservoir.
 
 ### Reading a bucket
 
@@ -88,6 +110,11 @@ None.
 | `ACCOUNT_STATE_BYTES`    | 120   | EIP-8037 byte count of an account leaf, new or created              |
 | `CODE_STATE_BYTES`       | 1     | EIP-8037 byte count per byte of deployed code                       |
 | `DELEGATION_STATE_BYTES` | 23    | EIP-8037 byte count of an EIP-7702 delegation indicator             |
+| `PRE_FORK_SSTORE_SET_COST` | 20,000 | Pre-Satin price of a fresh slot's `SSTORE`, the legacy share's base for a slot |
+| `PRE_FORK_NEW_ACCOUNT_COST` | 25,000 | Pre-Satin price of a new account, the legacy share's base for an account |
+| `PRE_FORK_CREATE_COST`   | 32,000 | Pre-Satin price of a `CREATE`, the legacy share's base for a created account |
+| `SSTORE_WRITE_COST`      | 10,000 | Regular cost of a fresh slot's `SSTORE` before its load cost ([Gas Schedule and Intrinsic Gas](gas-schedule.md)) |
+| `CREATE_ACCESS`          | 12,000 | Regular creation access of `CREATE` and `CREATE2` ([Gas Schedule and Intrinsic Gas](gas-schedule.md)) |
 
 ## Rationale
 
@@ -110,6 +137,13 @@ So the transaction gets no outcome, and the node reports the fault.
 **Why reference SALT's mapping instead of restating it?**
 The bucket a key lands in is SALT's own definition, as the capacities are SALT's state; this specification prices by the bucket SALT names, and two nodes that disagree on the mapping disagree on SALT itself.
 
+**Why a legacy share?**
+With a reservoir, a state charge is paid from it and costs nothing in regular gas, so a fresh slot written with a reservoir costs 12,100 of regular gas where it cost 22,100 before Satin, whatever the multiplier; a sender adds a reservoir by raising the gas limit above the execution cap, which costs it almost nothing.
+A contract written for Rex that relies on a fixed amount of regular gas being too little to write a slot — a failure handler that should run out of gas after a starved call — would then complete when it should not.
+The legacy share takes the pre-Satin price of a slot, an account or a creation from regular gas first, so the regular gas such an operation costs is at least what it cost before Satin; it is flat, because contracts ported from Ethereum assume Ethereum's price and the SALT multiplier would only recreate Rex6's surcharge in regular gas.
+It covers the three states an opcode creates; deployed code, a delegation indicator and the charges made before the first frame have no pre-Satin counterpart a contract budgets for, and history gas is new.
+The share is the one ethereum/EIPs#12581 proposes for EIP-8037.
+
 **Why EIP-161 emptiness, and existence for an authority?**
 Since EIP-161 Ethereum treats an empty account as a dead one: `CALL` charges its new-account cost for a value sent to an empty account, whether or not a leaf is stored for it, and Ethereum's Amsterdam specification decides a value call's, a `SELFDESTRUCT`'s and a creation's new account by that test.
 Using it at every such site — a value call, a `SELFDESTRUCT`'s beneficiary, a transaction's recipient, a deposit's caller, a created address — keeps an empty leaf from being priced as new at one site and as existing at another, and keeps the state gas and the state-growth count of the same account in step.
@@ -121,6 +155,7 @@ The witness still tells an empty leaf from no account, because a stateless valid
 - If a node read a bucket more than once in a transaction and the capacity differed, a give-back would not cancel its charge, and a transaction could mint gas by writing and clearing slots.
 - If a node priced a failed or impossible capacity (below `MIN_BUCKET_SIZE`) at some multiplier, two nodes failing differently would settle the same transaction at different prices.
 - If a node mapped keys to buckets with another function than SALT's, its prices would differ from the chain's on every state charge outside a minimum-size bucket.
+- If a node scaled the legacy share by the multiplier, or applied it to a charge it does not cover, the regular gas a frame holds after the charge would differ from every other node's, and so would every later forward and `GAS` reading; if it omitted the share, a sender who adds a reservoir could write a slot from a failure handler with 12,100 of regular gas.
 - If the protocol's own transactions read buckets, a block's pre-block calls and its Mega System Transactions would depend on SALT reads a stateless validator is not given.
 - If `m` scaled regular gas, the execution cap would bound less computation in crowded regions of the state than in sparse ones.
 

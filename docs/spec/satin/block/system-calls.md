@@ -26,7 +26,7 @@ If the budget of a pre-block call depended on the block's gas limit, or its stat
   A transaction is not a system call, a Mega System Transaction included: every transaction's gas is split by the execution cap (see [Two-Pool Gas](../evm/gas-model.md)).
   A system call is the protocol's own work and is exempt as [Mega System Transactions](../system-contracts/system-tx.md) (`SATIN-MST-008`) specifies.
 - `SATIN-PBLK-002` Each pre-block call MUST run from `SYSTEM_CALLER` on `PRE_BLOCK_CALL_GAS_LIMIT` of gas, whatever the block's gas limit: `SYSTEM_CALL_REGULAR_GAS_LIMIT` of regular gas and a reservoir of `PRE_BLOCK_CALL_GAS_LIMIT − SYSTEM_CALL_REGULAR_GAS_LIMIT`, the state gas of `SYSTEM_CALL_RESERVOIR_SLOTS` new storage slots at `m = 1`.
-  State gas the reservoir cannot pay MUST spill onto the regular gas, as for any frame (see [Two-Pool Gas](../evm/gas-model.md)).
+  A state charge MUST draw the call's pools as any frame's does: its legacy share, for a fresh slot, from the regular gas, then the reservoir, then the rest from the regular gas (see [Two-Pool Gas](../evm/gas-model.md), [State Gas and SALT Pricing](../evm/state-gas.md)).
   A pre-block call does not draw on the block's gas limit.
 
 ### The pre-block sequence
@@ -73,7 +73,7 @@ A fixed budget makes every pre-block call's gas a protocol value; the block's ga
 
 **Why sixteen slots of reservoir?**
 EIP-8037 sizes a system call's reservoir as the state gas of `SYSTEM_MAX_SSTORES_PER_CALL` = 16 new slots.
-On MegaETH's chains the EIP-2935 and EIP-4788 addresses hold those EIPs' own code, and `applyPendingChanges()` writes at most six new slots when it applies both roles, so the reservoir pays all of a pre-block call's state gas; other code at those addresses runs on the same budget, and what the reservoir cannot pay spills.
+On MegaETH's chains the EIP-2935 and EIP-4788 addresses hold those EIPs' own code, and `applyPendingChanges()` writes at most six new slots when it applies both roles, so the reservoir pays all of a pre-block call's state gas but the legacy share of each fresh slot, which its regular gas pays; other code at those addresses runs on the same budget, and what the reservoir cannot pay comes from the regular gas.
 None of these calls reads `GAS`, so how the budget is split changes no call's result.
 
 **Why this order?**

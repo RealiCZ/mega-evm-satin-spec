@@ -1,5 +1,5 @@
 ---
-description: Satin (unstable) — History Gas and the History Allowance. The third gas ledger: the price per byte of what a transaction appends to the chain's history, the byte table, when each history charge is made and given back, the refill order, the exemptions, the floor, and the 160-byte history allowance of a value call.
+description: Satin (unstable) — History Gas and the History Allowance. The third gas ledger: the price per byte of what a transaction appends to the chain's history, the byte table, when each history charge is made and given back, the give-back rule, the exemptions, the floor, and the 160-byte history allowance of a value call.
 spec: Satin
 maturity: unstable
 ---
@@ -50,15 +50,15 @@ A value transfer that triggers a `receive()` hook must also be able to emit an e
 - `SATIN-HIST-005` The records of the applied EIP-7702 authorities, and the record the transaction's own frame makes at its start (its value's recipient or its created account), MUST be charged before the first frame.
   A list the KV or state-growth limit skips has no authority records, and that history is not charged ([EIP-7702 Authorizations Before the First Frame](authorizations.md)).
   The authorities' records are the transaction's own: their history MUST be kept when the first frame fails or is stopped.
-  The first frame's record is that frame's: its history gas MUST come back with that frame when the frame fails or is stopped.
+  The first frame's record is that frame's: its history gas MUST come back, into the transaction's reservoir, when that frame fails or is stopped.
   When the destruction table takes that record back inside a first frame that then succeeds, the charge has already come back with the table, and the settlement MUST NOT give it back a second time; when that first frame then fails, the table's give-back is discarded with the table, and the settlement MUST give the charge back once.
   A transaction that runs out of gas before its first frame keeps neither ([Gas Schedule and Intrinsic Gas](gas-schedule.md)).
 - `SATIN-HIST-006` A log, a storage write's record, and the records of a `SELFDESTRUCT` (the account it clears and its beneficiary) MUST be charged by the opcode once it completed.
   A record the opcode takes back — a slot written back to its original value, an account a `SELFDESTRUCT` returns to what the transaction loaded, each part the destruction table takes back — MUST be given back by the opcode then, before what it makes is charged.
-- `SATIN-HIST-007` A part the destruction table takes back MUST be given back to the destroying frame, including when another frame paid it, and a failure of that frame discards the give-back (`SATIN-SD-010`, [SELFDESTRUCT and the Destruction Table](selfdestruct.md)).
-  Every other give-back of history gas, and every give-back of state gas but the destruction table's, MUST go to the frame that makes it, at the price the record or the state was charged, in the refill order of `SATIN-HIST-012`, whichever frame paid the charge: a slot written back to its original value, and an account a `SELFDESTRUCT` returns to what the transaction loaded, give back to the frame running the opcode; an account a value transfer returns to what the transaction loaded gives back to the caller of that start once the frame returned with its start kept (`SATIN-HIST-009`); a start's records and state gas that a failed or stopped child discards give back to its caller when the child returns (`SATIN-HIST-014`, `SATIN-POOL-015`).
-  A failed frame's own charges, its records and logs among them, are given back by its rollback (`SATIN-POOL-014`), and a give-back the failed frame received is discarded with it: the record it took back stands again, and its charge stays where it was paid.
-  A frame can therefore spend, while it runs, gas an ancestor paid for records or state that the frame takes back; that gas is at most the price of those records and that state, and it returns up the chain with the frame's unspent gas when the frame succeeds, so the transaction's total is unchanged unless that gas changes what the frame executes.
+- `SATIN-HIST-007` A part the destruction table takes back MUST be given back into the reservoir of the destroying frame, including when another frame paid it, and a failure of that frame discards the give-back (`SATIN-SD-010`, [SELFDESTRUCT and the Destruction Table](selfdestruct.md)).
+  Every other give-back of history gas, and every give-back of state gas but the destruction table's, MUST go into the reservoir of the frame that makes it, at the price the record or the state was charged, by the rule of `SATIN-HIST-012`, whichever frame paid the charge: a slot written back to its original value, and an account a `SELFDESTRUCT` returns to what the transaction loaded, give back to the frame running the opcode; an account a value transfer returns to what the transaction loaded gives back to the caller of that start once the frame returned with its start kept (`SATIN-HIST-009`); a start's records and state gas that a failed or stopped child discards give back to its caller when the child returns (`SATIN-HIST-014`, `SATIN-POOL-015`).
+  A failed frame's own charges, its records and logs among them, are given back by its rollback (`SATIN-POOL-014`), and a give-back the failed frame received is undone with it: the record it took back stands again, and its charge stays where it was paid.
+  The frame that makes a give-back decides only whose reservoir holds it: a frame can pay state and history charges, while it runs, with gas an ancestor paid for records or state the frame takes back, at most the price of those records and that state, but it cannot compute with that gas (`SATIN-POOL-007`, `SATIN-POOL-009`); what it does not spend returns up the chain with its reservoir when it succeeds.
 - `SATIN-HIST-008` An opcode that fails after its write was observed — an `SSTORE` or a `SELFDESTRUCT` that cannot pay a regular charge it makes after its load — MUST keep nothing and MUST be charged no history.
   A `LOG` observes its write after every regular charge of the inherited opcode, so only the limits and its history charge can fail it after its write was observed.
 - `SATIN-HIST-013` A record an opcode commits — a storage write, a log, a `SELFDESTRUCT`'s records — MUST be held to the limits ([Resource Limits](resource-limits.md)) before its history is charged, so a record a limit refuses is not charged.
@@ -69,22 +69,23 @@ A value transfer that triggers a `receive()` hook must also be able to emit an e
 - `SATIN-HIST-014` At a frame start the order is the reverse of an opcode's: the calling opcode MUST pay for the start's records before the frame starts, and they are then held to the limits, so a caller that cannot pay runs out of gas first; the charge for a start a limit stops MUST be given back when the stopped frame returns.
 - `SATIN-HIST-015` The opcode MUST charge the records a start makes as the state stands when it runs: a value the caller cannot fund makes no record and is charged no history; a creation whose creator's nonce cannot be bumped, whose endowment the creator cannot fund, or which is past the call-depth limit starts no frame and is charged no history and no state gas, the creation opcode refusing it before it charges for the start and before it reads the created address.
   The refusal takes back none of the opcode's regular charges made before it — a call's static cost, memory, value-transfer cost and cold access, a creation's static cost, initcode cost and memory — and a regular charge that crosses gas detention stops the frame before the refusal is reached ([Gas Detention](gas-detention.md)).
-  A value `CALL` to an account empty under EIP-161 that its caller cannot fund, or that is past the call-depth limit, MUST still charge the new account's state gas at step 2 of `SATIN-HIST-010`, before the refusal, and that charge MUST be given back to the caller when the call returns refused (`SATIN-POOL-015`); a caller that cannot pay it runs out of gas.
+  A value `CALL` to an account empty under EIP-161 that its caller cannot fund, or that is past the call-depth limit, MUST still charge the new account's state gas, its legacy share included, at step 2 of `SATIN-HIST-010`, before the refusal, and that charge MUST be given back into the caller's reservoir when the call returns refused (`SATIN-POOL-015`); a caller that cannot pay it runs out of gas.
 - `SATIN-HIST-010` A value `CALL` to an account empty under EIP-161 MUST charge its caller in this order:
   1. its regular gas: the access's static cost, memory, the value transfer, then the cold surcharge with the new account's regular gas, which is zero ([Gas Schedule and Intrinsic Gas](gas-schedule.md));
-  2. the new account's state gas, the reservoir first;
+  2. the new account's state gas: its legacy share from regular gas (`SATIN-STATE-012`), then the reservoir, then the rest from regular gas;
   3. the forward of the regular gas left ([Gas Forwarding](gas-forwarding.md));
   4. the history of the start's records.
 
-  A state charge that spills onto regular gas therefore shrinks the forward, and the records' history does not; the forward is regular gas only.
+  The legacy share, and a state charge's part the reservoir cannot pay, therefore shrink the forward, and the records' history does not; the forward is regular gas only.
   The child MUST be given its reservoir share after the history charge, from the reservoir that charge left the caller (`SATIN-POOL-011`).
-- `SATIN-HIST-011` A `CREATE` or `CREATE2` MUST charge the created account's state gas, when the account at the created address is empty under EIP-161 (no account, or nonce zero, zero balance and no code), before it computes the forward, and MUST give the creation its reservoir share after the history of the start's records, as a call does.
+- `SATIN-HIST-011` A `CREATE` or `CREATE2` MUST charge the created account's state gas, its legacy share included (`SATIN-STATE-012`), when the account at the created address is empty under EIP-161 (no account, or nonce zero, zero balance and no code), before it computes the forward, and MUST give the creation its reservoir share after the history of the start's records, as a call does.
 - Deployed code is charged at the deposit, in the order of `SATIN-SCHED-011` ([Gas Schedule and Intrinsic Gas](gas-schedule.md)).
 
-### The refill order
+### The give-back rule
 
-- `SATIN-HIST-012` Every give-back of state gas or of history gas MUST credit the frame's regular gas first, up to the outstanding spill of that frame (`SATIN-POOL-008`), and the rest to its reservoir; state charges and history charges share that spill.
-  A give-back inside a frame uses this order, as the rollback of a failed frame does ([Two-Pool Gas](gas-model.md)).
+- `SATIN-HIST-012` Every give-back of state gas or of history gas — a refill (a slot written back, an account returned to what the transaction loaded, a record taken back), the destruction table's, a start's charge given back when the start fails or is refused, a failed frame's rollback — MUST credit the reservoir of the frame that receives it (`SATIN-HIST-007`, `SATIN-SD-005`, `SATIN-POOL-015`, `SATIN-POOL-014`) and MUST NOT credit its regular gas, whichever pool paid the charge, a legacy share included.
+  A frame's regular gas MUST NOT rise within the frame except by the unused regular gas a child returns (`SATIN-POOL-012`); a give-back of a charge regular gas paid leaves that gas spent and puts its price into the reservoir, where it can pay later state and history charges, and what is left of it returns to the sender at the settlement (`SATIN-POOL-017`).
+  An exceptional halt consumes the halting frame's regular gas, with the part of its charges that regular gas paid, and restores its reservoir to what it received (`SATIN-POOL-014`).
 
 ### Exemptions and the floor
 
@@ -151,9 +152,13 @@ Pricing each kept record at its 40 bytes ties the price to what the block holds:
 
 **Why does a give-back go to the frame that makes it, and not to the frame that paid?**
 A give-back is made by an opcode, and only the frame running that opcode is there to receive it: the frame that paid may be suspended above, or may have returned already, and crediting it would mean reaching into another frame's gas while a different frame runs.
-EIP-8037 refills its own state gas the same way — a slot written from zero and back refills the running frame's reservoir — so a slot's state and history give-backs land in the same frame.
-The cost is that a callee can spend, while it runs, gas an ancestor paid for the records it takes back; that gas is bounded by the price of those records, it comes back up the chain with the callee's unspent gas, and it changes the transaction's total only when it changes what the callee does.
+EIP-8037 refills its own state gas in the running frame too, so a slot's state and history give-backs land in the same frame.
+Since a give-back credits a reservoir only (`SATIN-HIST-012`), the frame decides only whose reservoir holds the gas: a callee can pay state and history, while it runs, with gas an ancestor paid for the records it takes back, bounded by their price, but cannot compute with it, and what it does not spend returns up the chain.
 The destruction table is the exception that still goes to the destroying frame for a different reason: the parts it gives back may have been paid by frames that have all returned.
+
+**Why does a give-back credit the reservoir and never regular gas?**
+Under EIP-8037 at the pinned commit a refill goes to regular gas first, up to what regular gas paid, so `GAS` can rise within a frame; on MegaETH, where a transaction at or below the execution cap has no reservoir, that is every give-back, and history gas makes every log and write record part of it.
+A contract that records a failure after a failed call only when it holds more gas than a starved call could leave it relies on spent gas staying spent, as it always did under Rex6; the reservoir-only rule keeps that true for regular gas, at no cost to the sender, whose unused reservoir returns at the settlement ([Two-Pool Gas](gas-model.md)).
 
 **Why is the body an upper bound?**
 The sender's account and the four fee credits are written by the settlement, after the result is final, where a charge could no longer change the outcome.
@@ -169,8 +174,8 @@ A deposit is derived from L1 and has already paid L1 for its bytes, and the prot
 ## Security Considerations
 
 - If a node charged a record's history after a limit refused it, a stopped frame would pay for bytes the block does not keep; if it held the record to the limits after charging, a frame could be charged for a write that never happens.
-- If a give-back did not follow the refill order, a frame could turn reservoir it was given into regular gas, and compute past the regular budget its caller forwarded.
-- If a node credited a give-back to the frame that paid instead of the frame that makes it, the running frame's `GAS`, its forwards and whether a later charge fits would differ from every other node's while it runs, by up to the price of the records it takes back.
+- If a give-back credited regular gas, a frame's `GAS` would rise by state and history gas the frame or another frame had spent: a slot cleared after a failed call, or an intermediary's revert, would hand back to the running frame regular gas that a contract checking its gas after a failed call assumes is gone; and a frame could turn reservoir it was given into regular gas, and compute past the regular budget its caller forwarded.
+- If a node credited a give-back to the frame that paid instead of the frame that makes it, the reservoirs of the frames would differ from every other node's while they run, and so would whether a later state or history charge fits in a frame's reservoir or spills onto its regular gas.
 - If a failed frame kept a give-back it received, a callee could take back a record its caller paid for, collect the gas and revert, leaving the record standing and the gas spent twice.
 - If the allowance entered the frame's gas, a value call could compute on 14,080 gas its caller never forwarded, and repeated calls could amplify computation without paying for it.
 - If the settlement gave the first frame's record back after the destruction table had already given it back, the transaction would be credited the same history twice.
