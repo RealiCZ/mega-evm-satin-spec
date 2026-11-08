@@ -20,7 +20,7 @@ ERC-20 transfers carry a `Transfer` event that indexers already read; value tran
 ## Specification
 
 - `SATIN-LOG-001` A node MUST apply EIP-7708's transfer log: every movement of value to another account — the transaction's value, a value `CALL`, a creation's endowment, a `SELFDESTRUCT` that moves a balance to another account — MUST emit `Transfer(address indexed from, address indexed to, uint256 value)` from `TRANSFER_LOG_ADDRESS`, with `TRANSFER_TOPIC` as its first topic, `from` and `to` as its second and third, and `value` as its data.
-  <!-- pending owner decision: QG-07 the EIP-7708 revision to pin -->
+  The transfer log MUST be that of EIP-7708 as of [commit `f7230c46a7`](https://github.com/ethereum/EIPs/commit/f7230c46a743313957d8f38a159bda934cc735b2) (10 July 2026), the revision current when the EIP-8037 profile was frozen (`SATIN-POOL-004`), as this page restates it.
 - `SATIN-LOG-002` The log MUST appear in the receipt in execution order among the contracts' own logs, where the value moves; a failed frame's transfer logs MUST be discarded with the rest of its logs.
 - `SATIN-LOG-003` A `CALLCODE`, a call to the calling account itself, and a transaction's value sent to its own sender move nothing to another account and MUST NOT log.
 - `SATIN-LOG-004` A deposit's value MUST be logged; its mint MUST NOT be.

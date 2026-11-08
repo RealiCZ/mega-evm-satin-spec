@@ -30,8 +30,12 @@ Rex6 bounded it by lowering the transaction's limit on a separate compute-gas le
   - the Oracle's storage, through `SLOAD` in the Oracle's own frame ([Oracle](../system-contracts/oracle.md)).
 - `SATIN-DET-002` `BLOBHASH` MUST NOT be a volatile read: it reads the transaction's own blob hashes.
 - `SATIN-DET-003` A read MUST be marked where its opcode loads the value, and only once the opcode completed; a load that fails, and a read whose opcode then fails, MUST mark nothing.
+  A call opcode's read of the beneficiary's account — as the call's target or as the EIP-7702 delegate it follows — completes when the start is decided: it MUST be marked after the opcode's charges and its forward, before the child runs its first instruction, and not when the call returns.
+  Its `compute_at_read` (`SATIN-DET-012`) MUST NOT include the regular gas the call forwards: the caller's compute at that point is its regular gas spent less that forward, as `SATIN-DET-009` counts a suspended caller.
+  A transaction's read of `SATIN-DET-008` is marked before its first frame, at the compute of the charges made before it.
 - `SATIN-DET-004` Every `BLOCKHASH` MUST be a read of the block environment, whatever its operand: the opcode loads the block number before it decides whether its operand is in range, so one of the current block, of a future block or of a block outside the last 256 is a read, and one in range reads the hash as well.
-- `SATIN-DET-005` A call to the EIP-2935 history contract MUST be a read of the block environment, because the contract's `get` path executes `NUMBER` before it loads the slot.
+- `SATIN-DET-005` A call to the EIP-2935 history contract MUST be a read of the block environment only when, and where, the contract's code completes a `NUMBER`, by `SATIN-DET-001` and `SATIN-DET-003`; the call itself MUST NOT be marked.
+  The contract's `get` path executes `NUMBER` before it loads the slot, so a call that reaches the load is a read; a call that fails before its `NUMBER` — forwarded too little gas to reach it, or refused by the contract's input check that comes first — marks nothing.
   An `SLOAD` of the storage the EIP-2935 and EIP-4788 pre-block calls write MUST NOT be a volatile read: it is state committed before the block's first transaction.
 - `SATIN-DET-006` A `CREATE` or `CREATE2` MUST NOT be marked as a read, and MUST NOT be refused in a frame whose volatile-data access is off ([MegaAccessControl](../system-contracts/mega-access-control.md)), also when its creator or its created address is the block beneficiary: its loads of them — the creator's, to check its balance and nonce, and the created address's, to decide the created account's state gas — are the creation's own checks.
   A creation transaction is not detained from its start because its created address is the block beneficiary.
@@ -53,7 +57,9 @@ Rex6 bounded it by lowering the transaction's limit on a separate compute-gas le
   - `compute_at_read` — the transaction's compute when the read is marked.
   - `cap` — `BLOCK_ENV_ACCESS_COMPUTE_GAS` for a read of the block environment or of the beneficiary's account, and `ORACLE_ACCESS_COMPUTE_GAS` for a read of the Oracle's storage.
 - `SATIN-DET-013` The caps are protocol values fixed by the spec with the other limits (`SATIN-LIM-017`), and MUST NOT be taken from configuration.
-  Both are below `MAX_TX_COMPUTE_GAS`, the most compute a transaction can spend: `EXECUTION_CAP − TX_BASE_COST − WARM_STORAGE_READ_COST`, the execution cap less the base cost every transaction pays and the least a frame pays for the code it runs.
+  Both are below `MAX_TX_COMPUTE_GAS`, `EXECUTION_CAP − TX_BASE_COST − WARM_STORAGE_READ_COST`: the execution cap less the base cost every transaction pays and the least a frame pays for the code it runs, the most regular gas a transaction's frames can spend from its regular budget net of the stipends that come back to their callers.
+  It is not a bound on compute: a transaction's compute can exceed it by the stipends of its value calls (`SATIN-DET-010`), as 18,000 value calls of 1 wei that each forward no gas to an account with no code spend 163,800,000 net regular gas and count at least 205,200,000 of compute.
+  That the caps are below it means only that either cap can be reached within a transaction's regular budget.
 
 ### Withheld gas
 
@@ -77,7 +83,7 @@ A transaction that read volatile data therefore runs exactly as it would without
 
 ### Precompiles
 
-- `SATIN-DET-021` A call to a precompile MUST make its own regular charges first, as any opcode's — its static cost, its memory, the value transfer and a cold access — and one that crosses MUST stop the calling frame before the price is consulted and before anything moves, whether or not the caller can fund the value (`SATIN-LIM-010`).
+- `SATIN-DET-021` A call to a precompile MUST make its own regular charges first, as any opcode's — its static cost, its memory and the value transfer; every precompile of the set is warm from the transaction's start (`SATIN-SCHED-012`), so the call makes no cold access — and one that crosses MUST stop the calling frame before the price is consulted and before anything moves, whether or not the caller can fund the value (`SATIN-LIM-010`).
   A call to a precompile forwarded more regular gas than the frame's allowance — what the limit leaves the transaction at the call — MUST then be decided from the precompile's price, read before it runs, for the precompile and input of the called address (`SATIN-PCMP-008`):
   - priced within the allowance, it runs on its whole forward;
   - priced past the allowance and within its forward, it MUST NOT run and is the crossing;
@@ -110,7 +116,7 @@ None.
 | ------------------------------ | ----------- | ------------------------------------------------------------------------------------ |
 | `BLOCK_ENV_ACCESS_COMPUTE_GAS` | 20,000,000  | Compute a transaction may still spend after a read of the block environment or the beneficiary |
 | `ORACLE_ACCESS_COMPUTE_GAS`    | 20,000,000  | Compute a transaction may still spend after a read of the Oracle's storage            |
-| `MAX_TX_COMPUTE_GAS`           | 199,987,900 | The most compute a transaction can spend                                              |
+| `MAX_TX_COMPUTE_GAS`           | 199,987,900 | The execution cap less the base cost and one warm access; compute can exceed it by returned stipends |
 | `EXECUTION_CAP`                | 200,000,000 | The execution cap ([Two-Pool Gas](gas-model.md))                                      |
 | `TX_BASE_COST`                 | 12,000      | EIP-2780 base cost ([Gas Schedule and Intrinsic Gas](gas-schedule.md))                |
 | `WARM_STORAGE_READ_COST`       | 100         | Warm account access                                                                   |

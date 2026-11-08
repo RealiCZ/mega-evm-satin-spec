@@ -29,7 +29,7 @@ And the bytes a transaction appends to the chain's history (its body, logs, writ
   The rules of the EIP a transaction's outcome depends on are stated on this page and on the pages it links; the EIP is cited for their provenance.
 - `SATIN-POOL-002` A node MUST apply these later changes to EIP-8037: the child-merge return of [commit `3ff5cff17a`](https://github.com/ethereum/EIPs/commit/3ff5cff17a11ab31273ee14ebea0df8bbc4f4aef) (4 September 2026), as `SATIN-POOL-012` states it; the failure outcome of [commit `9dcd72754f`](https://github.com/ethereum/EIPs/commit/9dcd72754f3fe4b48a4dbeffee669dc4c60f7ec5) (14 September 2026), as `SATIN-POOL-016` states it; and the collision rule of [commit `dbc6d457cb`](https://github.com/ethereum/EIPs/commit/dbc6d457cbf90d5f9d55552f3fd91d58b88cc898) (18 September 2026), under which a creation does not collide on storage, as [SELFDESTRUCT and the Destruction Table](selfdestruct.md) states it.
 - `SATIN-POOL-003` A node MUST NOT apply the transaction gas cap of [commit `d7087803ca`](https://github.com/ethereum/EIPs/commit/d7087803ca236498c73f64665df0ddac7d621950) (14 September 2026): a transaction's gas limit is not capped at `TX_MAX_TOTAL_GAS_LIMIT` and stays bounded by the block's gas limit (see [Base Layer](../base-layer.md)).
-  A node MUST NOT apply the commit of the pre-execution spill of [commit `9dcd72754f`](https://github.com/ethereum/EIPs/commit/9dcd72754f3fe4b48a4dbeffee669dc4c60f7ec5): a spill made before the first frame stays outstanding and is unwound by the reservoir the first frame returns (`SATIN-POOL-016`).
+  A node MUST NOT apply the commit of the pre-execution spill of [commit `9dcd72754f`](https://github.com/ethereum/EIPs/commit/9dcd72754f3fe4b48a4dbeffee669dc4c60f7ec5): a spill made before the first frame, other than the body's excess of `SATIN-POOL-006`, stays outstanding and is unwound by the reservoir the first frame returns (`SATIN-POOL-016`).
 - `SATIN-POOL-004` The profile of EIP-8037 a node applies MUST be the one `SATIN-POOL-001` to `SATIN-POOL-003` and `SATIN-POOL-022` define, frozen at [commit `dbc6d457cb`](https://github.com/ethereum/EIPs/commit/dbc6d457cbf90d5f9d55552f3fd91d58b88cc898) (18 September 2026).
   A node MUST NOT apply a change made to EIP-8037 after that commit, whatever the EIP's status becomes; the removal of an unused counter ([commit `052029f362`](https://github.com/ethereum/EIPs/commit/052029f3625328d6f51dec8e62a7090201e66f17)), the co-author lines and the move to Last Call change no rule a transaction executes.
 - `SATIN-POOL-022` A node MUST apply these departures from EIP-8037, each specified where it is linked:
@@ -52,7 +52,8 @@ And the bytes a transaction appends to the chain's history (its body, logs, writ
 
   Validation guarantees that `intrinsic_regular_gas` does not exceed `min(gas_limit, EXECUTION_CAP)` ([Transaction Validation and Refusals](../block/transaction-validation.md)).
 - `SATIN-POOL-006` The intrinsic state gas, which is the history gas of the transaction's body ([History Gas and the History Allowance](history-gas.md)), MUST be taken from the reservoir first and only its excess from the regular budget, before the first frame starts.
-  The excess taken from the regular budget is outstanding spill of the transaction (`SATIN-POOL-008`).
+  The excess taken from the regular budget MUST NOT be outstanding spill (`SATIN-POOL-008`): no reservoir a frame returns unwinds it, and it is not added to the spill `SATIN-POOL-016` keeps outstanding on the transaction.
+  The body is charged before every other charge, so when it has an excess the reservoir is already zero, every later charge made before the first frame spills whole, and a reservoir the first frame returns comes from give-backs of those later charges, which their own spill absorbs.
 - `SATIN-POOL-021` A node MUST NOT keep a separate compute-gas limit or ledger.
   Computation is paid in regular gas, bounded by the execution cap and, once a transaction read volatile data, by [gas detention](gas-detention.md).
 
@@ -66,7 +67,8 @@ And the bytes a transaction appends to the chain's history (its body, logs, writ
   State charges and history charges share one outstanding spill per frame.
 - `SATIN-POOL-009` `GAS` MUST push the regular gas the frame has left, and MUST NOT include the reservoir.
 
-A give-back of state or history gas inside a frame follows the refill order of [History Gas and the History Allowance](history-gas.md): the frame's regular gas first, up to its outstanding spill, and the rest to its reservoir.
+A give-back of state or history gas inside a frame goes to the frame that makes it and follows the refill order of [History Gas and the History Allowance](history-gas.md) (`SATIN-HIST-007`, `SATIN-HIST-012`): the frame's regular gas first, up to its outstanding spill, and the rest to its reservoir.
+Every pattern of a write and its take-back, with what each ledger does, is listed on [Write and Take-Back Patterns](take-backs.md).
 
 ### Frames
 
@@ -93,13 +95,14 @@ A give-back of state or history gas inside a frame follows the refill order of [
   - `caller_outstanding_spill` — the caller's outstanding spill, after `SATIN-POOL-013` has applied.
 
   The reservoir the caller kept at the start MUST NOT be drawn to unwind its spill.
-  When the caller has no outstanding spill, the caller holds the reservoir it had after the charges it made for the start plus the returned reservoir.
+  When the caller has no outstanding spill, the caller holds the reservoir it kept at the start, `remaining − reservoir_share` (`SATIN-POOL-011`), plus the returned reservoir.
+  A caller with 100 reservoir after the start's charges and no outstanding spill keeps 2 and gives the child 98; a child that returns all 98 leaves the caller 100.
 - `SATIN-POOL-013` When the child succeeded, its outstanding spill MUST be added to the caller's outstanding spill before `SATIN-POOL-012` applies.
   When the child reverted or halted, its outstanding spill MUST NOT be added: its rollback already credited that spill to the regular gas it returns, and a halt consumes it.
 - `SATIN-POOL-014` When a frame reverts or halts, the state and history charges it made, and those its successful children merged into it, MUST be given back as EIP-8037 specifies: the part the reservoir paid returns to the reservoir, so the frame's reservoir is again the reservoir it received when it started, and the part that spilled returns to the frame's regular gas, its outstanding spill becoming zero.
   A revert then returns the frame's unspent regular gas, that returned spill included, to its caller; an exceptional halt consumes the frame's regular gas, that returned spill included.
   A failed child therefore returns the reservoir share it was given, however its start was answered.
-- `SATIN-POOL-015` When a start for which the caller charged an account leaf's state gas — a value `CALL` to an account that is empty under EIP-161, or a `CREATE` or `CREATE2` onto an empty address — returns without that leaf added, because the child failed, the caller MUST be given that charge back after `SATIN-POOL-012` applied, by the refill order of [History Gas and the History Allowance](history-gas.md).
+- `SATIN-POOL-015` When a start for which the caller charged an account leaf's state gas — a value `CALL` to an account that is empty under EIP-161, or a `CREATE` or `CREATE2` onto an address empty under EIP-161 — returns without that leaf added, because the child failed or, for a `CALL`, because the start was refused after the charge (a value the caller cannot fund, a call past the call-depth limit), the caller MUST be given that charge back after `SATIN-POOL-012` applied, by the refill order of [History Gas and the History Allowance](history-gas.md).
 - `SATIN-POOL-016` A state or history charge made for an authority before the first frame ([EIP-7702 Authorizations Before the First Frame](authorizations.md)), and any spill it made, MUST stay outstanding on the transaction when the first frame starts, and the reservoir the first frame returns MUST unwind that spill by `SATIN-POOL-012`, together with any other spill outstanding on the transaction.
   A failure of the first frame MUST NOT return reservoir that such a charge drew: the first frame received the reservoir that charge left, and its rollback restores only that (`SATIN-POOL-014`).
 
@@ -117,14 +120,16 @@ A give-back of state or history gas inside a frame follows the refill order of [
   | State gas   | The state charges the transaction kept                    |
   | History gas | The history charges the transaction kept, its body's included |
 
-  - `total` — the receipt's gas used.
+  - `total` — what the transaction spent from both pools, the intrinsic gas included, before the EIP-3529 refund and before the floor of `SATIN-POOL-020`; it is not the receipt's gas used of `SATIN-POOL-018`, which is that spend less the refund and at least the floor.
   - `state`, `history` — the state and history charges kept, net of every give-back.
 
+  The EIP-3529 refund MUST NOT lower any ledger, and the floor MUST NOT raise one: the receipt's gas used and the three ledgers are separate figures.
+  A call that clears one cold slot whose original value is not zero, and does nothing else, spends 27,106 regular gas and 30,800 history gas; its refund is `min(11,616, floor(57,906 / 5)) = 11,581`, its receipt's gas used 46,325, and its regular ledger 27,106.
   State or history gas that spilled onto regular gas MUST stay on its own ledger.
   The ledgers of a failed deposit are specified on [Deposit Transactions](../block/deposits.md).
 - `SATIN-POOL-020` The EIP-7623 floor, as EIP-7976 and EIP-7981 amend it, MUST be computed and validated as the Amsterdam schedule computes it, from the base and per-byte costs of [Gas Schedule and Intrinsic Gas](gas-schedule.md).
   The figure a block counts on its execution ledger for a transaction MUST be `max(regular, floor)`, with `regular` the transaction's regular-gas ledger, from which history gas is taken out before the floor applies ([Block Limits and Packing](../block/block-limits.md)).
-  <!-- pending owner decision: QG-07 the EIP-7623, EIP-7976 and EIP-7981 revisions to pin -->
+  The floor MUST be that of EIP-7623 as of [commit `451cd9e1ec`](https://github.com/ethereum/EIPs/commit/451cd9e1ecb30b19be1c02199760a70d6248e604) (15 May 2025), amended by EIP-7976 and EIP-7981 at the commits of `SATIN-SCHED-001`.
 
 ### Retired ids
 

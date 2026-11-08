@@ -1,5 +1,5 @@
 ---
-description: Satin (unstable) — Gas Schedule and Intrinsic Gas. The Amsterdam gas schedule with its two changes, the regular-gas entries that differ from Osaka, the EIP-2780 intrinsic regular gas and the floor, the charges made before the first frame and their out-of-gas path, the code-deposit charge order, and the addresses warm from a transaction's start.
+description: Satin (unstable) — Gas Schedule and Intrinsic Gas. The Amsterdam gas schedule with its three changes, the regular-gas entries that differ from Osaka, the EIP-2780 intrinsic regular gas and the floor, the charges made before the first frame and their out-of-gas path, the code-deposit charge order, and the addresses warm from a transaction's start.
 spec: Satin
 maturity: unstable
 ---
@@ -24,13 +24,14 @@ A charge that depends on state cannot be made correctly before the state is read
 
 ### The schedule
 
-- `SATIN-SCHED-001` The gas schedule MUST be Amsterdam's — including [EIP-8038](https://eips.ethereum.org/EIPS/eip-8038)'s state-access prices, [EIP-2780](https://eips.ethereum.org/EIPS/eip-2780)'s decomposition of the intrinsic cost, [EIP-7976](https://eips.ethereum.org/EIPS/eip-7976)'s calldata floor and [EIP-7981](https://eips.ethereum.org/EIPS/eip-7981)'s access-list floor — with exactly two changes:
+- `SATIN-SCHED-001` The gas schedule MUST be Amsterdam's — including [EIP-8038](https://eips.ethereum.org/EIPS/eip-8038)'s state-access prices, [EIP-2780](https://eips.ethereum.org/EIPS/eip-2780)'s decomposition of the intrinsic cost, [EIP-7976](https://eips.ethereum.org/EIPS/eip-7976)'s calldata floor and [EIP-7981](https://eips.ethereum.org/EIPS/eip-7981)'s access-list floor — with exactly three changes:
   - the EIP-8037 state-gas entries MUST be rebuilt at `COST_PER_STATE_BYTE` ([State Gas and SALT Pricing](state-gas.md));
-  - the history gas of deposited code MUST be `COST_PER_HISTORY_BYTE` per byte ([History Gas and the History Allowance](history-gas.md)), where Amsterdam prices it at zero.
+  - the history gas of deposited code MUST be `COST_PER_HISTORY_BYTE` per byte ([History Gas and the History Allowance](history-gas.md)), where Amsterdam prices it at zero;
+  - the forwarding reduction of a call or a creation MUST be the 98/100 cap of [Gas Forwarding](gas-forwarding.md) (`SATIN-FWD-001`), where Amsterdam keeps EIP-150's 63/64: a caller keeps `remaining × 2 / 100` of its regular gas instead of `remaining / 64`, so 1,000 regular gas forwards 980, not 985.
 
   Every other entry MUST be Amsterdam's: every regular-gas entry, the regular code-deposit cost, the EIP-7702 entries, and the entries Amsterdam introduced for EIP-8037, EIP-2780, EIP-7976 and EIP-7981.
   The regular gas of creating state is therefore the access and the write EIP-8038 prices, and the new state itself is paid in state gas alone.
-  <!-- pending owner decision: QG-07 the EIP-8038, EIP-2780, EIP-7976 and EIP-7981 revisions to pin -->
+  A node MUST apply EIP-8038 as of [commit `4c7e2487e4`](https://github.com/ethereum/EIPs/commit/4c7e2487e4da3131bcadc7399f8b153f5344c0b7) (18 September 2026), EIP-2780 as of [commit `7243c92ba8`](https://github.com/ethereum/EIPs/commit/7243c92ba812437c64bae9fc6524ee269b29daa9) (4 September 2026), EIP-7976 as of [commit `c998ef94eb`](https://github.com/ethereum/EIPs/commit/c998ef94eb16a6af8a9b8e2084f947b17ea14865) (7 July 2026) and EIP-7981 as of [commit `747b78c0ed`](https://github.com/ethereum/EIPs/commit/747b78c0edfdf04e9e2933ad1bec592d3318e1d9) (7 July 2026), each the revision current when the EIP-8037 profile was frozen (`SATIN-POOL-004`); every value of them a transaction's outcome depends on is restated on this page, so the pins are their provenance.
 - `SATIN-SCHED-002` The static gas every opcode pays before its dynamic cost MUST be Amsterdam's: `EXTCODESIZE` and `EXTCODECOPY` pay `WARM_STORAGE_READ_COST` twice, one access for the account and one for its code, and every other opcode's static gas is the same in Osaka and Amsterdam.
 - `SATIN-SCHED-003` The regular-gas, state-gas and history-gas entries below MUST have the values in the Value column; each differs from Osaka, or is one EIP-8038 restates at its Osaka value:
 
@@ -39,7 +40,7 @@ A charge that depends on state cannot be made correctly before the state is read
   | Warm storage read                                    | 100    | 100     |
   | Cold account access, additional                      | 2,500  | 2,900   |
   | Cold storage access of an `SLOAD`, additional        | 2,000  | 2,000   |
-  | Cold storage access of an `SSTORE`                   | 2,100  | 2,000   |
+  | Cold storage access of an `SSTORE`, additional       | 2,100  | 2,000   |
   | Value transfer of a call, with its 2,300 stipend     | 9,000  | 11,300  |
   | New account of a call                                | 25,000 | 0       |
   | New account of `SELFDESTRUCT`                        | 25,000 | 9,000   |
@@ -84,11 +85,14 @@ A charge that depends on state cannot be made correctly before the state is read
 
 ### Charges made at the start of execution
 
-- `SATIN-SCHED-008` The state-dependent parts of a transaction's cost MUST be charged at the start of its execution, before its first frame, as EIP-2780 and EIP-8037 specify, every state charge priced as [State Gas and SALT Pricing](state-gas.md) says:
-  - the new-account state gas of the transaction's recipient, when its value creates it, or of its created account, when the created address is empty;
-  - for each authorization the list applies ([EIP-7702 Authorizations Before the First Frame](authorizations.md)): the new-account state gas of an authority that does not exist, the delegation indicator's state gas at most once per authority, and `ACCOUNT_WRITE` for the authority's first write;
-  - for a deposit, a Mega System Transaction executed as one included, whose caller account does not exist: the new-account state gas of that account, exactly once ([Deposit Transactions](../block/deposits.md));
-  - the history gas of the write records made outside every frame: the applied authorities' records and the record of the first frame's start ([History Gas and the History Allowance](history-gas.md)).
+- `SATIN-SCHED-008` The state-dependent parts of a transaction's cost MUST be charged at the start of its execution, before its first frame, as EIP-2780 and EIP-8037 specify, every state charge priced as [State Gas and SALT Pricing](state-gas.md) says and every new-account charge decided by the predicate of `SATIN-STATE-011` (the account is empty under EIP-161), in this order:
+  1. for a deposit, a Mega System Transaction executed as one included, whose caller is empty under EIP-161: the new-account state gas of that account, exactly once (`SATIN-DEP-003`, [Deposit Transactions](../block/deposits.md));
+  2. for each authorization the list applies, in list order ([EIP-7702 Authorizations Before the First Frame](authorizations.md)): the new-account state gas of an authority empty under EIP-161, then `ACCOUNT_WRITE` for the authority's first write, then the delegation indicator's state gas at most once per authority;
+  3. the history gas of the write records made outside every frame: the applied authorities' records and the record of the first frame's start ([History Gas and the History Allowance](history-gas.md));
+  4. the new-account state gas of the transaction's recipient, when its value goes to a recipient empty under EIP-161, or of its created account, when the created address is empty under EIP-161.
+
+  `ACCOUNT_WRITE` MUST NOT be charged for an authority whose account write the transaction has already paid: the sender, whose write validation pays in `TX_BASE_COST`; the recipient of a transaction that carries a non-zero value, whose write `TX_VALUE_COST` pays; and an authority an earlier applied authorization of the list already wrote.
+  The recipient or the created address is read at step 4 and at no earlier step, so a transaction that cannot pay a charge of steps 1 to 3 loads nothing of it.
 - `SATIN-SCHED-009` A transaction that cannot pay a charge of `SATIN-SCHED-008` — the account a deposit creates for its caller, an authorization's charges, the history of the records made outside a frame, or the charge for the first frame's start — MUST run out of gas without running a frame.
   An authorization list the KV or state-growth limit skips is charged nothing ([EIP-7702 Authorizations Before the First Frame](authorizations.md)), and this path does not apply to it.
 - `SATIN-SCHED-010` On that path everything applied before the first frame MUST be taken back, except what validation did to the sender's account (its fee and a call's nonce bump) and the account a deposit created for its caller: the applied EIP-7702 authorizations with their nonce and delegation writes, the sender's own authorization included, their state gas and their write records.
@@ -137,8 +141,8 @@ None.
 Amsterdam is the schedule EIP-8037 was written for: it splits every cost of creating state into the regular work EIP-8038 prices and the state EIP-8037 prices, and its intrinsic cost under EIP-2780 charges a recipient's access and a value's writes only where the transaction makes them.
 Running EIP-8037 on Osaka's schedule would charge creating state twice.
 
-**Why only two changes?**
-The state-gas entries carry MegaETH's cost per state byte, because MegaETH's state is priced by its own measure and scaled by SALT; deposited code gets a history price, because every node keeps the code it receives.
+**Why only three changes?**
+The state-gas entries carry MegaETH's cost per state byte, because MegaETH's state is priced by its own measure and scaled by SALT; deposited code gets a history price, because every node keeps the code it receives; and the forwarding reduction is MegaETH's 98/100, which keeps more gas back at each level of a deep call stack than 63/64 does at MegaETH's block gas limits.
 Every other entry is Amsterdam's, so an Ethereum tool that prices Amsterdam prices Satin's regular gas correctly.
 
 **Why charge an authority's state at the start of execution?**

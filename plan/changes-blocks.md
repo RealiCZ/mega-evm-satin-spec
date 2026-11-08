@@ -2,11 +2,11 @@
 
 Where an implementation differs from the text of the Satin pages `satin/overview.md`, `satin/base-layer.md`, `satin/system-contracts/` and `satin/block/`, this list names the rule, the implementation, the place, and what must change.
 (a) is mega-evm `5e3f30ad` (`a:` = `crates/mega-evm/src/`); (b) is the `next/` workspace at mega-evm `785182eb` (`b:` = `next/mega-evm2/src/`, `op:` = `next/op-evm2/src/`), on the evm2 fork at `91518705` (`evm2:` = `crates/evm2/src/`).
-Line numbers are of those commits.
+Line numbers are of those commits, except the last four rows of (b), which were read at (b) `d04e8f80` on the evm2 fork at `8751da2b`.
 
 | Counts | (a) | (b) |
 | --- | --- | --- |
-| Changes | 3 | 12 |
+| Changes | 3 | 16 |
 | Of which in both | 3 (`SATIN-BASE-005`, `SATIN-WIT-004`, `SATIN-ACT-010`) | 3 (the same) |
 
 ## Implementation (a)
@@ -33,6 +33,10 @@ Line numbers are of those commits.
 | `SATIN-BASE-005` | `b:lib.rs:208` (`ins::slotnum`) | `SLOTNUM` pushes zero (QA-05); the instruction pushes the block environment's slot number. As for (a): the engine or every node fixes it at zero. |
 | `SATIN-WIT-004` | `b:eip7702.rs:194`–`198` (`simulate` only when `entries > kv_room \|\| entries > growth_room`) | No short-list fast path (QD-01 option 2): simulate every list, loading every authority whose entry passes the chain-id, nonce and signature gates. |
 | `SATIN-ACT-001`, `SATIN-ACT-002`, `SATIN-ACT-003` | none (b has no chain configuration, schedule or activation logic, QC-06) | The chain configuration key, the refused `satin…` keys and the base-fork check are part of the specification (QG-05 option 1); (b), or the node that embeds it, must implement them. |
+| `SATIN-ORCL-002`, `SATIN-ORCL-006`, `SATIN-ORCL-007`, `SATIN-WIT-015`, `SATIN-WIT-016` | `b:intercept.rs:162` (an admitted hint is pushed onto `mechanisms.hints`; no service is called); `b:lib.rs:343` (an Oracle read answers from `cfg.oracle`, a fixed map, `b:ledger.rs:45–46`) and `:345` (the read is counted as an integer, `b:ledger.rs:167`); the transaction result type has no Oracle record (`op:evm.rs:118–128`, used at `b:lib.rs:101`) | Call the node's oracle service synchronously: hand it each admitted hint (topic, data, calling frame) when the call is made, and ask it at each Oracle read, so that a hint can change a later answer for the same slot; record every read's slot and optional answer, in order, on the transaction's outcome, so that a block's witness can be assembled from its outcomes. Draining the hints after execution cannot meet `SATIN-ORCL-006`. (a) conforms (the hint is handed to the service in `a:system/oracle.rs`, each read is asked and recorded at `a:evm/host.rs:678–680`, and the records are on the outcome, `a:evm/result.rs`). |
+| `SATIN-VAL-008`, `SATIN-VAL-010`, `SATIN-OUT-015` | `b:tx.rs:554` (`account_info_untracked(&tx.from).ok().flatten()` turns a failed read of the deposit's sender into no account), so `:555` marks the caller created, `:584–595` count its growth, and `:640` charges its state gas | Propagate the read's error: a failed database read of the sender gives the transaction no outcome and is classified as `SATIN-VAL-010` says, never a fabricated new caller and a failed deposit. |
+| `SATIN-WIT-013`, `SATIN-WIT-016` | `b:ledger.rs:257` (`begin_tx` clears `bucket_reads`), `:678` (only the running transaction's lookups are recorded); nothing in `b:block.rs` keeps them per outcome or as a block union | Keep the SALT buckets every transaction of the block read — a candidate the builder discarded included — as the block's union, or on each transaction's outcome, so the block reports every capacity a replay reads. (a) conforms (`a:evm/state.rs:86` `BucketRecord`, emptied when a block starts, exported by `a:block/executor.rs:542`). |
+| `SATIN-WIT-002`, `SATIN-WIT-005`, `SATIN-WIT-008`, `SATIN-REG-003`, `SATIN-DEP-012` | `b:tx.rs:782` (`failed_deposit` calls `clear_transaction_state()` before it bumps the nonce and mints), `evm2:evm/state/mod.rs:533` (that clears the transaction's overlay), so the pending state the block takes (`evm2:evm/state/mod.rs:1004` `take_pending_state`, `b:block.rs:281`) names the caller alone; `op:handler.rs:353` does the same | Keep every account and slot a failed deposit loaded — the registry's account and slot 0, and whatever its first frame read before it halted — in the state it returns, while still taking back their writes, as (a) does (op-revm reverts the journal to its first checkpoint and keeps the loads). |
 
 ## Noted, no change required
 

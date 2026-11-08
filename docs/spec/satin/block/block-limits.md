@@ -22,7 +22,7 @@ And a builder that executes transactions ahead of committing them must not commi
 
 ### What a block counts
 
-- `SATIN-BLK-001` A block MUST count, for each transaction it includes, the transaction's regular gas as `max(regular, floor)`, its state gas, its history gas, its history bytes, its data size, its KV updates and its state growth, as the transaction reports them (see [Two-Pool Gas](../evm/gas-model.md) and [Resource Accounting](../evm/resource-accounting.md)).
+- `SATIN-BLK-001` A block MUST count, for each transaction it includes, the transaction's regular gas as `max(regular, floor)`, its state gas, its history gas, its history bytes (`SATIN-HIST-022`: zero for a transaction exempt from history gas), its data size, its KV updates and its state growth, as the transaction reports them (see [Two-Pool Gas](../evm/gas-model.md), [History Gas](../evm/history-gas.md) and [Resource Accounting](../evm/resource-accounting.md)).
 
 ### The packing budgets
 

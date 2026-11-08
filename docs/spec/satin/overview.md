@@ -49,6 +49,7 @@ A page that gathers rules whose detail lives elsewhere — [Halts, Reverts and S
 - [Gas Schedule and Intrinsic Gas](evm/gas-schedule.md) — the Amsterdam schedule and EIP-2780 intrinsic gas.
 - [State Gas and SALT Pricing](evm/state-gas.md) — state gas scaled by the SALT bucket the state lands in.
 - [History Gas and the History Allowance](evm/history-gas.md) — the price of the bytes a transaction appends to history.
+- [Write and Take-Back Patterns](evm/take-backs.md) — every write a transaction makes and takes back, and what each ledger and count does with it.
 - [Gas Forwarding](evm/gas-forwarding.md) — the 98/100 forward of regular gas and of the reservoir.
 - [Resource Limits](evm/resource-limits.md) — data size, KV updates and state growth per transaction and per frame.
 - [Resource Accounting](evm/resource-accounting.md) — what each dimension counts and when.

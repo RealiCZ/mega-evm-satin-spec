@@ -92,8 +92,9 @@ interface ISequencerRegistry {
 
   **Scheduling.** Only the admin may schedule a change (`NotAdmin()` otherwise).
   Each role has at most one pending change; a new schedule overwrites it.
-  The pair `(address(0), type(uint256).max)` cancels the pending change and needs no other check.
-  Otherwise the activation block MUST be above the current block number (`InvalidActivationBlock()`), fit in a `uint96` (`ActivationBlockTooLarge()`), and the new address MUST be non-zero (`ZeroAddress()`).
+  Both scheduling methods first require the activation block to be above the current block number (`InvalidActivationBlock()`).
+  An activation block of `type(uint256).max` then cancels the role's pending change: the new address MUST be zero, and a non-zero one reverts with `ZeroAddress()`; a sequencer change's signature is ignored; and no other check is made, the `uint96` bound included, so `(0x11…11, type(uint256).max)` reverts with `ZeroAddress()` and not `ActivationBlockTooLarge()`.
+  Any other activation block MUST fit in a `uint96` (`ActivationBlockTooLarge()`), and the new address MUST be non-zero (`ZeroAddress()`).
   A sequencer change MUST further satisfy `activationBlock ≥ block.number + minRotationDelay()` (`RotationDelayTooShort()`) and carry `newSequencerSignature`, a 65-byte `r ‖ s ‖ v` signature by the new sequencer's key over `rotationDigest(newSequencer, activationBlock)`, with `s` at most half the secp256k1 order and `v` 27 or 28, recovering to `newSequencer` (`InvalidRotationProof()` otherwise).
   The checks of a sequencer change are made in the order `InvalidActivationBlock`, the cancellation, `ActivationBlockTooLarge`, `ZeroAddress`, `RotationDelayTooShort`, the signature.
   `rotationDigest` is the [EIP-712](https://eips.ethereum.org/EIPS/eip-712) digest `keccak256(0x1901 ‖ domainSeparator ‖ keccak256(abi.encode(SEQUENCER_ROTATION_TYPEHASH, newSequencer, activationBlock)))` with the domain `name = ROTATION_DOMAIN_NAME`, `version = ROTATION_DOMAIN_VERSION`, `chainId = block.chainid`, `verifyingContract` the registry, the domain separator computed at each call.

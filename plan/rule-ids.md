@@ -20,6 +20,7 @@ Examples: `SATIN-POOL-005` (the execution cap and the initial split of the gas l
 | `SCHED` | `satin/evm/gas-schedule.md` |
 | `STATE` | `satin/evm/state-gas.md` |
 | `HIST` | `satin/evm/history-gas.md` |
+| `TAKE` | `satin/evm/take-backs.md` |
 | `FWD` | `satin/evm/gas-forwarding.md` |
 | `LIM` | `satin/evm/resource-limits.md` |
 | `ACCT` | `satin/evm/resource-accounting.md` |
@@ -48,7 +49,7 @@ Examples: `SATIN-POOL-005` (the execution cap and the initial split of the gas l
 | `ACT` | `satin/block/activation.md` |
 
 The index pages (`satin/overview.md`, `satin/evm/overview.md`, `satin/block/overview.md`) state no rule and have no area.
-The outline assigns 384 ids over 31 areas.
+The outline assigns 384 ids over 31 areas; the area `TAKE`, added with the page of write and take-back patterns, takes its ids from `SATIN-TAKE-001` in the page's order.
 
 ## One rule, one id
 

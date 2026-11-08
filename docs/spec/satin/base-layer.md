@@ -36,8 +36,8 @@ The rules of this page apply to every block from Satin's activation on (see [Act
 
 ### Opcodes
 
-- `SATIN-BASE-004` A node MUST enable `DUPN` (`DUPN_OPCODE`), `SWAPN` (`SWAPN_OPCODE`) and `EXCHANGE` (`EXCHANGE_OPCODE`) as [EIP-8024](https://eips.ethereum.org/EIPS/eip-8024) defines them.
-- `SATIN-BASE-005` A node MUST enable `SLOTNUM` (`SLOTNUM_OPCODE`) of [EIP-7843](https://eips.ethereum.org/EIPS/eip-7843), and `SLOTNUM` MUST push zero in every block.
+- `SATIN-BASE-004` A node MUST enable `DUPN` (`DUPN_OPCODE`), `SWAPN` (`SWAPN_OPCODE`) and `EXCHANGE` (`EXCHANGE_OPCODE`) as [EIP-8024](https://eips.ethereum.org/EIPS/eip-8024) as of [commit `34b49095ca`](https://github.com/ethereum/EIPs/commit/34b49095ca5f7343045da279f04e7ecd1e451393) (10 June 2026) defines them, the revision current when the EIP-8037 profile was frozen (see [Two-Pool Gas](evm/gas-model.md)).
+- `SATIN-BASE-005` A node MUST enable `SLOTNUM` (`SLOTNUM_OPCODE`) of [EIP-7843](https://eips.ethereum.org/EIPS/eip-7843) as of [commit `e44e1960a9`](https://github.com/ethereum/EIPs/commit/e44e1960a9328282af8dd884837c2302f6a45c3d) (17 September 2026), and `SLOTNUM` MUST push zero in every block.
   `SLOTNUM` is a read of the block environment: it is a volatile read for [gas detention](evm/gas-detention.md), and a frame whose volatile-data access is off is refused it (see [MegaAccessControl](system-contracts/mega-access-control.md)).
 
 ### Deposit-only activation blocks
@@ -48,7 +48,8 @@ The rules of this page apply to every block from Satin's activation on (see [Act
 - `SATIN-BASE-007` A fork MUST be taken to activate in a block when the chain configuration schedules it, it is active at the block's timestamp, and it is not active at the parent block's timestamp.
   A fork the chain configuration does not schedule MUST NOT be taken to activate in any block.
 - `SATIN-BASE-008` A Mega System Transaction is a legacy transaction, so a block that admits only deposits MUST NOT contain one either.
-  The block in which Satin activates therefore carries no write of the [Oracle](system-contracts/oracle.md), and owes none: its only transactions are deposits, and a deposit from the system address is a failed deposit, which runs no call (see [Mega System Transactions](system-contracts/system-tx.md)).
+  The block in which Satin activates therefore carries no Mega System Transaction, and the protocol requires no write of the [Oracle](system-contracts/oracle.md) in it: its only transactions are deposits, and a deposit from the system address is a failed deposit, which runs no call (see [Mega System Transactions](system-contracts/system-tx.md)).
+  A deposit from another sender can still write the Oracle in that block through code running at the live system address, as `SATIN-ORCL-011` states, when the registry already names such a contract or a delegated account as the system address.
 
 ### The data-availability footprint
 
@@ -59,7 +60,7 @@ The rules of this page apply to every block from Satin's activation on (see [Act
 
 ### Pricing against the L1 block information
 
-- `SATIN-BASE-010` Every non-deposit transaction MUST be priced against the L1 block information the block's own L1 attributes deposit wrote.
+- `SATIN-BASE-010` Every non-deposit transaction that pays an L1 fee — every non-deposit transaction but a Mega System Transaction, which pays no fee (`SATIN-MST-005`) — MUST be priced against the L1 block information the block's own L1 attributes deposit wrote.
   That information MUST be what the L1 block contract holds on the state left by the transactions before the block's first non-deposit transaction other than a Mega System Transaction, and it MUST hold for every later transaction of the block.
   The data-availability footprint gas scalar is the exception: it MUST be read from the contract again before each non-deposit transaction, a Mega System Transaction included.
   Which slots of the contract that information is read from, and when the block reads them, is specified in [The Stateless Witness](block/stateless-witness.md) and [System Calls and the Pre-Block Sequence](block/system-calls.md).

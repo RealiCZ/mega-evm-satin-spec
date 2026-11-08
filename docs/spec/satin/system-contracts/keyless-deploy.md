@@ -70,7 +70,7 @@ interface IKeylessDeploy {
 | ---- | --------------- | ------- |
 | step-1 | Charge `KEYLESS_DEPLOY_OVERHEAD_GAS` of regular gas | Out of gas |
 | step-2 | The call carries no value | `NoEtherTransfer()`, answered before the call's frame is built (see `SATIN-KEY-018`): no value moves |
-| step-3 | The arguments decode as `(bytes, uint256)`, and the first decodes as a signed legacy transaction that is a creation (`to` empty), carries no chain id, and is followed by no trailing byte | `MalformedEncoding()` for an encoding that does not decode or has trailing bytes, `NotContractCreation()`, `NotPreEIP155()` |
+| step-3 | The arguments decode as `(bytes, uint256)`, and the first decodes as a signed legacy transaction that is a creation (`to` empty), carries no chain id, and is followed by no trailing byte | In this order: `MalformedEncoding()` for an encoding that does not decode or has trailing bytes, then `NotContractCreation()` for a transaction with `to` set, then `NotPreEIP155()` for one with a chain id |
 | step-4 | The carried transaction's nonce is 0 | `NonZeroTxNonce(uint64)` |
 | step-5 | The initcode is at most `MAX_INITCODE_SIZE` bytes | `InitCodeTooLarge(uint64,uint64)` |
 | step-6 | `gasLimitOverride` (read as `MAX_UINT64` when larger) is at least the signed gas limit | `GasLimitTooLow(uint64,uint64)` |
@@ -86,11 +86,13 @@ interface IKeylessDeploy {
 
   "Available gas" is the call's regular gas a `CREATE` could forward, its withheld part included (see [Gas Detention](../evm/gas-detention.md)).
   The state charges of steps 10 and 14 are made as every state charge is, the reservoir first and the rest spilling onto regular gas (see [Two-Pool Gas](../evm/gas-model.md)), priced as [State Gas and SALT Pricing](../evm/state-gas.md) specifies; the history charge of step 14 is priced as [History Gas](../evm/history-gas.md) specifies.
-- `SATIN-KEY-006` A call that more than one of steps 3 to 13 would refuse MUST be refused with the error of the first of them in the table's order.
+- `SATIN-KEY-006` A call that more than one of steps 3 to 13 would refuse MUST be refused with the error of the first of them in the table's order, and a call that step 3 refuses for more than one reason with the first error in step 3's own order: a carried transaction with `to` set and a chain id is refused with `NotContractCreation()`.
 - `SATIN-KEY-007` The read of the signer's account that steps 8 to 10 and 13 check MUST load the account into the transaction's state as an account access loads it, warm: with its code, unless the node's configuration disables EIP-3607, in which case without it, so that a deployment with EIP-3607 disabled loads no signer code and makes no signer-code refusal.
   The read of step 12 MUST load the deploy address's account warm, without its code.
   Neither read is charged, and no charge the call or its creation makes depends on either account's warmth: the creation loads both accounts again when it starts, as a creation loads its creator and the address it creates.
-- `SATIN-KEY-008` Step 12 MUST check the deploy address's code alone: an address that holds a nonce or a balance but no code passes it, and the creation then collides there, as any creation onto an occupied address does, and fails; the call answers `ExecutionHalted` with the creation's whole forward spent, and the signer's nonce is kept or taken back as `SATIN-KEY-013` says.
+- `SATIN-KEY-008` Step 12 MUST check the deploy address's code alone.
+  An address that holds a nonce other than zero but no code passes it, and the creation then collides there, as any creation onto an address with a nonce does (`SATIN-SD-016`), and fails; the call answers `ExecutionHalted` with the creation's whole forward spent, and the signer's nonce is kept or taken back as `SATIN-KEY-013` says.
+  An address that holds only a balance — nonce zero and no code — passes it and is not a collision: the creation lands there, keeps that balance, and deploys as on an empty address.
 - `SATIN-KEY-009` A creation at the deploy address whose constructor returns empty code MUST be refused its empty code deposit and MUST revert, its state, logs and records taken back as for a creation that reverted, so that the address stays deployable; the call answers `EmptyCodeDeployed`.
   A constructor that destroyed the account it was creating leaves no code either, and the call answers `EmptyCodeDeployed` for it too.
   The rule concerns the deploy address alone: a creation the constructor itself makes may return empty code.
@@ -112,6 +114,7 @@ interface IKeylessDeploy {
 
   The signer's write record MUST be counted after that rule: when the nonce set back leaves the signer's account as the transaction loaded it, no record stands, and the history gas step 14 charged for it MUST be given back; a signer's account another write changed — value a creation that returned without a revert or a halt moved out of it, or into it — keeps its record.
   When the signer's nonce stands where it was and step 10 charged state gas for the signer's account, that state gas MUST be given back.
+  No execution reaches that last case: step 10 charges only a signer empty under EIP-161, whose nonce is zero, and once steps 11 to 15 have passed the creation always bumps that nonce, which a deployment from nonce zero keeps; the sentence gives the case an answer, and no test can reach it.
 
 ### The answer
 

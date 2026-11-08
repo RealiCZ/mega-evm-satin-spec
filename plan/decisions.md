@@ -1,6 +1,6 @@
 # Satin Specification — The Owner's Decisions
 
-The owner's answers to the questions of [questions.md](questions.md), decided on 8 November 2026, as the Satin section is written from them.
+The owner's answers to the questions of [questions.md](questions.md), decided on 8 November 2026 (QH-01 and QH-02, raised by the review of the written section, on 9 November 2026), as the Satin section is written from them.
 Each line gives the question, the decision, and the reason in one line; where a decision changes an implementation, the change is listed in [changes-evm.md](changes-evm.md) for the execution pages and in the block pages' own list for the rest.
 
 ## The rule for the QE items
@@ -49,6 +49,8 @@ This rule covers the QE items only; every other question follows its recommendat
 | [QG-04](questions.md#qg-04) | (1): implementation-specific statements are restated as behaviour; the rest goes to node documentation | The specification describes behaviour, not code |
 | [QG-05](questions.md#qg-05) | (1): the node-integrator parts that decide consensus are in the specification; pool and RPC behaviour is node documentation | Only consensus belongs in the specification |
 | [QG-06](questions.md#qg-06) | (2): executions outside a block are node documentation; `SATIN-LIM-018` is retired | The specification covers block execution and validation |
+| [QH-01](questions.md#qh-01) | (1): every give-back of state gas or history gas, except the destruction table's (`SATIN-HIST-007` first sentence, `SATIN-SD-005`), goes to the frame that makes it, in the refill order of `SATIN-HIST-012`; a failed frame's rollback stays as `SATIN-POOL-014` says; no implementation changes | Both implementations credit the frame that takes the record back, as EIP-8037's own state-gas refill does, so one `SSTORE`'s state and history give-backs land in the same frame |
+| [QH-02](questions.md#qh-02) | (1): one predicate for every new-account charge and state-growth rise — the account is empty under EIP-161 (no account, or nonce zero, zero balance and no code) — for a deposit's or Mega System Transaction's caller, an EIP-7702 authority, a value call's recipient, a `SELFDESTRUCT`'s beneficiary and a creation's address (`SATIN-STATE-011`); `SATIN-ACCT-015` gains the matching exception, `SATIN-WIT-017` stays; both implementations change their authority predicate (changes-evm rows 11 and 12) | The same as Ethereum since EIP-161, and what both implementations already do for every site but the authority |
 
 ## Added requirement
 

@@ -1,5 +1,5 @@
 ---
-description: Satin (unstable) — Satin EVM Overview. The index of Satin's execution pages: two-pool gas, the gas schedule, state and history gas, forwarding, the resource limits and their accounting, authorizations, SELFDESTRUCT, the limit stop, gas detention, outcomes, transfer logs, size limits and precompiles.
+description: Satin (unstable) — Satin EVM Overview. The index of Satin's execution pages: two-pool gas, the gas schedule, state and history gas, the write and take-back patterns, forwarding, the resource limits and their accounting, authorizations, SELFDESTRUCT, the limit stop, gas detention, outcomes, transfer logs, size limits and precompiles.
 spec: Satin
 maturity: unstable
 ---
@@ -23,9 +23,10 @@ Each rule of these pages carries an id `SATIN-<AREA>-<NNN>` written at the start
 ### Gas
 
 - [Two-Pool Gas](gas-model.md) (`POOL`) — the regular-gas budget under the 200,000,000 [execution cap](../../glossary.md#execution-cap) and the state-gas [reservoir](../../glossary.md#reservoir); the three kinds of charge; how frames receive, return and give back the reservoir; the transaction's settlement and its three gas ledgers.
-- [Gas Schedule and Intrinsic Gas](gas-schedule.md) (`SCHED`) — the Amsterdam schedule with its two changes, the entry table, the EIP-2780 intrinsic regular gas and floor, the charges made before the first frame and their out-of-gas path, the code-deposit charge order, and the addresses warm from a transaction's start.
+- [Gas Schedule and Intrinsic Gas](gas-schedule.md) (`SCHED`) — the Amsterdam schedule with its three changes, the entry table, the EIP-2780 intrinsic regular gas and floor, the charges made before the first frame and their out-of-gas path, the code-deposit charge order, and the addresses warm from a transaction's start.
 - [State Gas and SALT Pricing](state-gas.md) (`STATE`) — `entry × m` on EIP-8037's byte counts at the cost per state byte, the [SALT bucket](../../glossary.md#salt-bucket) multiplier, where each state charge is made and how it is given back.
 - [History Gas and the History Allowance](history-gas.md) (`HIST`) — the price per byte of what a transaction appends to history, the byte table, when each history charge is made and given back, the refill order, the exemptions, and the [history allowance](../../glossary.md#history-allowance) of a value call.
+- [Write and Take-Back Patterns](take-backs.md) (`TAKE`) — every pattern in which a write is made and taken back, from a slot written `0 → x → 0` to a failed deposit, with what each gas ledger, the EIP-3529 refund counter and each resource count does, and which frame a give-back goes to.
 - [Gas Forwarding](gas-forwarding.md) (`FWD`) — the 98/100 cap on forwarded regular gas, the value-transfer stipend, and the reservoir share a child receives.
 
 ### Resource limits

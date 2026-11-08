@@ -38,6 +38,7 @@
   - [Gas Schedule and Intrinsic Gas](satin/evm/gas-schedule.md)
   - [State Gas and SALT Pricing](satin/evm/state-gas.md)
   - [History Gas and the History Allowance](satin/evm/history-gas.md)
+  - [Write and Take-Back Patterns](satin/evm/take-backs.md)
   - [Gas Forwarding](satin/evm/gas-forwarding.md)
   - [Resource Limits](satin/evm/resource-limits.md)
   - [Resource Accounting](satin/evm/resource-accounting.md)

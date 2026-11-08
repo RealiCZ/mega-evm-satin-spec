@@ -1,7 +1,7 @@
 # Satin Specification — Questions for the Owner
 
 Everything the owner had to decide before the specification text of the Satin section was written.
-Every item below carries the owner's **Decision** (8 November 2026), also listed in [decisions.md](decisions.md); [QG-07](#qg-07), added while the execution pages were written, is the one item still open.
+Every item below carries the owner's **Decision** (8 November 2026), also listed in [decisions.md](decisions.md); [QG-07](#qg-07), added while the execution pages were written, is the one item still open: its pins are filled under its recommended option and await the owner's confirmation.
 Each item gives its evidence, the options, a recommendation where the evidence supports one, and **Change needed**: which implementation would have to change under each option — (a) is mega-evm `5e3f30ad` (`crates/mega-evm/src/`, written `a:`), (b) is the `next/` workspace at mega-evm `785182eb` (`next/mega-evm2/src/`, written `b:`; `op:` for `next/op-evm2/src/`, `evm2:` for the evm2 fork at `91518705`).
 Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 **Outline** names the rules of [outline.md](outline.md) whose text waits on the answer.
@@ -15,7 +15,8 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 | (e) Open points the cross-checks recorded | 3 |
 | (f) Layout | 9 |
 | (g) Writing policy | 7 |
-| Total | 38 |
+| (h) Raised by the review of the written section | 2 |
+| Total | 40 |
 
 ## (a) Behaviour an implementation has that no source states
 
@@ -447,4 +448,48 @@ Line numbers are of `docs/spec/upgrades/satin.md` (the draft).
 - Recommendation: (2), with the date of the EIP-8037 freeze point (18 September 2026).
 - Change needed: whichever fork differs from the pinned revision.
 - Outline: `SATIN-POOL-020`, `SATIN-SCHED-001`, `SATIN-LOG-001`, `SATIN-PCMP-003`; the block pages' `SATIN-BASE-001`, `SATIN-BASE-004`.
-- **Decision**: pending. Each rule's place carries a `pending owner decision` comment.
+- **Decision**: pending. The pins are filled under option (2), with the date of the EIP-8037 freeze point, as the revision of each EIP's file current at the freeze commit `dbc6d457cb` (18 September 2026, 10:41 UTC), read from `ethereum/EIPs`; the owner's confirmation of the option is still to be recorded:
+
+  | EIP | Commit | Date | Where |
+  | --- | --- | --- | --- |
+  | EIP-8038 | `4c7e2487e4da3131bcadc7399f8b153f5344c0b7` | 18 September 2026 | `SATIN-SCHED-001` |
+  | EIP-2780 | `7243c92ba812437c64bae9fc6524ee269b29daa9` | 4 September 2026 | `SATIN-SCHED-001` |
+  | EIP-7976 | `c998ef94eb16a6af8a9b8e2084f947b17ea14865` | 7 July 2026 | `SATIN-SCHED-001`, `SATIN-POOL-020` |
+  | EIP-7981 | `747b78c0edfdf04e9e2933ad1bec592d3318e1d9` | 7 July 2026 | `SATIN-SCHED-001`, `SATIN-POOL-020` |
+  | EIP-7623 | `451cd9e1ecb30b19be1c02199760a70d6248e604` | 15 May 2025 (Final) | `SATIN-POOL-020` |
+  | EIP-7708 | `f7230c46a743313957d8f38a159bda934cc735b2` | 10 July 2026 | `SATIN-LOG-001` |
+  | EIP-7951 | `b55cdb0ee78a696327cf76d1c5cf8088d73499ca` | 21 January 2026 (Final) | `SATIN-PCMP-003` |
+  | EIP-8024 | `34b49095ca5f7343045da279f04e7ecd1e451393` | 10 June 2026 | `SATIN-BASE-004` |
+  | EIP-7843 | `e44e1960a9328282af8dd884837c2302f6a45c3d` | 17 September 2026 | `SATIN-BASE-005` |
+
+  Whether each fork follows its pinned revision in every respect was not checked; the values a transaction's outcome depends on are restated in the pages and were checked against both implementations when the pages were written.
+
+## (h) Raised by the review of the written section
+
+Two questions the review of the Satin section raised, where both implementations agree with each other and the text said otherwise; (a) is mega-evm `5e3f30ad`, (b) the `next/` workspace at mega-evm `d04e8f80` on the evm2 fork at `8751da2b`.
+
+### QH-01
+
+**Which frame a record's give-back goes to.**
+
+- Evidence: `SATIN-HIST-007` said that every record other than the destruction table's is given back "to the frame that paid it": a slot written back to its original value, an account returned to what the transaction loaded.
+  Both implementations credit the frame that takes the record back instead, in that frame's refill order: (a) refills the running frame's gas when the write completes (`a:evm/host.rs:357–360`, the revm fork's `cfg/gas.rs:484–495`), (b) books the give-back on the running frame (`b:lib.rs:533` → `b:ledger.rs:591–597`, `evm2:interpreter/gas.rs:461–468`).
+  Example: a contract P whose slot 0 holds 7 writes 8, paying the record's 3,520 history gas, then `DELEGATECALL`s C with no reservoir; C emits an empty `LOG0`, its 2,816 history gas spilling onto C's regular gas, writes slot 0 back to 7 and reads `GAS`. Under the text the 3,520 go to P; under both implementations they go to C, 2,816 unwinding C's spill and 704 entering C's reservoir, so C's `GAS` is 2,816 higher than the text says.
+  EIP-8037's own state-gas refill credits the running frame too (a slot written from zero and back refills the frame that writes it back), so under the text one `SSTORE`'s state and history give-backs would land in different frames.
+- Options: (1) the text follows both implementations: every give-back of state or history gas but the destruction table's goes to the frame that makes it; (2) both implementations change to credit the payer.
+- Recommendation: (1).
+- Change needed: (1) none; (2) (a) and (b).
+- **Decision**: (1), on 9 November 2026: every give-back of state gas or history gas, except the destruction table's (`SATIN-HIST-007` first sentence, `SATIN-SD-005`), goes to the frame that makes it, in the refill order of `SATIN-HIST-012`; a failed frame's rollback stays as `SATIN-POOL-014` says. The text states the consequence once (`SATIN-HIST-007`): a callee can spend, while it runs, gas an ancestor paid for records the callee takes back, bounded by those records' prices; the transaction's total is unchanged unless that gas changes the callee's path.
+
+### QH-02
+
+**What "new account" means for a deposit's caller and the other new-account sites.**
+
+- Evidence: the deposit rules charged the caller's new-account state gas and counted its unit of state growth when the caller "does not exist", and `SATIN-ACCT-015` said an account that already exists is never a rise; `SATIN-WIT-017` separates no account from an account leaf that is empty under EIP-161.
+  Both implementations decide the deposit caller by EIP-161 emptiness: (a) `a:evm/execution.rs:1543`, (b) `b:tx.rs:555`; so does Rex6 (`crates/mega-evm/src/evm/execution.rs:893` at `d4c913c5`).
+  Example: a deposit whose sender's leaf is in the state with nonce zero, zero balance and no code, calling an existing account with zero value and a gas limit of 100,000, is charged 183,600 state gas at the minimum bucket by both implementations, and so becomes a failed deposit counting one unit of state growth; the text charged nothing and counted nothing.
+  The other new-account sites use EIP-161 emptiness in both implementations too (a value call's recipient, a `SELFDESTRUCT`'s beneficiary, the transaction's recipient, a created address), except an EIP-7702 authority, which both decide by the account's absence (`revm:crates/handler/src/pre_execution.rs:394–398`, `evm2:ethereum/eip7702.rs:268`).
+- Options: (1) one predicate for every new-account charge and state-growth rise, EIP-161 emptiness; (2) existence of the leaf everywhere, and both implementations change for every site but the authority.
+- Recommendation: (1).
+- Change needed: (1) both implementations' authority predicate ([changes-evm.md](changes-evm.md) rows 11 and 12); (2) (a) and (b) at every other site.
+- **Decision**: (1), on 9 November 2026: the account is empty under EIP-161 — no account, or nonce zero, zero balance and no code — for a deposit's or Mega System Transaction's caller (`SATIN-DEP-003`, `SATIN-DEP-005`, `SATIN-SCHED-008`), an EIP-7702 authority (`SATIN-SCHED-008`, `SATIN-AUTH-008`), a value call's recipient and a creation's address (`SATIN-HIST-010`, `SATIN-HIST-011`, `SATIN-POOL-015`), and every other site of `SATIN-STATE-004` (`SATIN-STATE-011`); `SATIN-ACCT-015` gains the matching exception; `SATIN-WIT-017` stays: the witness still answers no account as no account and an empty leaf as a leaf, and only the charging does not tell them apart.

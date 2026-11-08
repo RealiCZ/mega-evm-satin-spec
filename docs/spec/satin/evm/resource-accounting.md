@@ -42,11 +42,11 @@ Counting state growth without its falls stops a transaction that creates and rem
 - `SATIN-ACCT-006` A record MUST be made where the write is, and taken back where a write returns the account or slot: a value transfer that returns an account to what the transaction loaded takes the record back in the frame the transfer starts, with its data size, and its history gas comes back to the caller once that frame returned with its start kept (`SATIN-HIST-009`); a `SELFDESTRUCT` whose move returns an account takes the record back where the opcode completed; a slot written back to its original value gives its record back.
   N value transfers from one frame to the same recipient keep one record for the recipient and one for the sender; a transfer and its exact return keep none; a recipient that passes on exactly what it received keeps none of its own; a frame that funds an address and then creates at it keeps two records, its own and the address's.
 - `SATIN-ACCT-007` A value-transferring `CALLCODE`, which moves the value from the calling account to that same account, and a value-transferring `CALL` to the calling account itself MUST change no account and record none.
-- `SATIN-ACCT-008` The sender's account is one of the body's fixed records (`SATIN-HIST-003`) and MUST NOT be recorded again: validation changes it before execution, by its fee and a call's nonce, and a creation transaction's first frame by its nonce, so no write execution makes to it — a frame running as the sender, a value transfer or a `SELFDESTRUCT` that moves value to it, a keyless deployment whose signer is the sender — changes it from what the transaction loaded.
+- `SATIN-ACCT-008` The sender's account is one of the body's fixed records (`SATIN-HIST-003`), which are data size and history bytes only and MUST NOT count as KV updates, and it MUST NOT be recorded again: validation changes it before execution, by its fee and a call's nonce, and a creation transaction's first frame by its nonce, so no write execution makes to it — a frame running as the sender, a value transfer or a `SELFDESTRUCT` that moves value to it, a keyless deployment whose signer is the sender — changes it from what the transaction loaded.
 - `SATIN-ACCT-009` An applied EIP-7702 authority is changed by its nonce and its delegation when it is applied: a write to it afterwards, the transaction's own value to it included, MUST add no record.
 - `SATIN-ACCT-010` The four fee accounts are in the body only for the fee credits the settlement makes, and are unchanged until execution writes them: a write execution makes to a fee account that is not the sender — a value transfer to it, a `SELFDESTRUCT` that moves a balance to it, an applied EIP-7702 authority that is one of them — MUST be recorded like a write to any other account.
 - `SATIN-ACCT-011` A successful frame's records and bytes MUST merge into its caller's; a failed frame's MUST be discarded, the records it took back standing again, except that a creator's nonce record is the creating frame's and survives the creation's failure (`SATIN-LIM-008`).
-- `SATIN-ACCT-012` The KV count MUST be the write-record count, held to `TX_KV_UPDATE_LIMIT`.
+- `SATIN-ACCT-012` The KV count MUST be the write-record count, held to `TX_KV_UPDATE_LIMIT`; the five fixed records of the body (`SATIN-HIST-003`) are not in it.
   Every record MUST weigh `WRITE_RECORD_SIZE` bytes of data size, counted and taken back with it, so `KV × WRITE_RECORD_SIZE ≤ data size` at every point.
   The KV check MUST be made although, at these constants, `TX_KV_UPDATE_LIMIT` records weigh more than `TX_DATA_LIMIT` bytes; a record taken back cannot cross it.
   Logs, deployed code, transfer logs and Oracle hints are not records.
@@ -57,13 +57,16 @@ Counting state growth without its falls stops a transaction that creates and rem
 - `SATIN-ACCT-014` The rises MUST be exactly:
   - a fresh slot, at the `SSTORE` transition of `SATIN-ACCT-016` that rises;
   - a value `CALL` to an account empty under EIP-161;
-  - a `SELFDESTRUCT` that moves a non-zero balance to an account that does not exist ([SELFDESTRUCT and the Destruction Table](selfdestruct.md));
-  - the recipient a transaction's value creates;
-  - an applied EIP-7702 authorization that creates its authority;
-  - a `CREATE`, a `CREATE2`, a creation transaction or a keyless creation, when the created address is empty;
+  - a `SELFDESTRUCT` that moves a non-zero balance to a distinct account empty under EIP-161 ([SELFDESTRUCT and the Destruction Table](selfdestruct.md));
+  - the recipient of a transaction's value, when it is empty under EIP-161;
+  - an applied EIP-7702 authorization whose authority is empty under EIP-161;
+  - a `CREATE`, a `CREATE2`, a creation transaction or a keyless creation, when the created address is empty under EIP-161;
   - a keyless signer's account, when the creation's nonce bump creates it, counted on the keyless call ([KeylessDeploy](../system-contracts/keyless-deploy.md));
-  - the caller account a deposit creates, a Mega System Transaction executed as a deposit included, once (`SATIN-ACCT-020`).
-- `SATIN-ACCT-015` An account that already exists MUST NOT be a rise, and neither MUST a `CALLCODE`, a value call to the calling account itself, deployed code, or a delegation indicator.
+  - the caller account of a deposit, a Mega System Transaction executed as a deposit included, when that caller is empty under EIP-161, once (`SATIN-ACCT-020`, `SATIN-DEP-003`).
+
+  Each is decided by the predicate of `SATIN-STATE-011`: the account is empty under EIP-161 — no account, or nonce zero, zero balance and no code.
+- `SATIN-ACCT-015` An account that is not empty under EIP-161 MUST NOT be a rise, and neither MUST a `CALLCODE`, a value call to the calling account itself, deployed code, or a delegation indicator.
+  An account whose leaf is in the state but is empty under EIP-161 is the exception to existence: at the sites of `SATIN-ACCT-014` it MUST be a rise as an absent account is, although the witness answers it as a leaf (`SATIN-WIT-017`).
 - `SATIN-ACCT-016` An `SSTORE` MUST change state growth by this table alone, whose columns are the slot's original value in the transaction, its present value, and the value written:
 
   | Original | Present  | New      | State growth |
@@ -86,7 +89,7 @@ Counting state growth without its falls stops a transaction that creates and rem
 - `SATIN-ACCT-018` A fall MUST happen at the opcode that restores the state, and a fall cannot cross a limit.
   The only slot fall is the table's row of original zero, present non-zero and new zero; the other falls are the destruction table's ([SELFDESTRUCT and the Destruction Table](selfdestruct.md)).
 - `SATIN-ACCT-019` A rise that would take the signed net past the transaction limit or the frame budget is the crossing, and that rise MUST NOT be kept ([Limit Stops](limit-stops.md)).
-- `SATIN-ACCT-020` A failed deposit that creates its caller, when that account did not exist, MUST count that account as one unit of state growth on the transaction's reported usage and on the block's counter, MUST NOT be charged state gas for it, and MUST NOT be stopped by the limit, the deposit having already failed ([Deposit Transactions](../block/deposits.md)).
+- `SATIN-ACCT-020` A failed deposit whose caller was empty under EIP-161 when the deposit was executed MUST count that account as one unit of state growth on the transaction's reported usage and on the block's counter, MUST NOT be charged state gas for it, and MUST NOT be stopped by the limit, the deposit having already failed ([Deposit Transactions](../block/deposits.md)).
   A deposit that runs to a success or a revert and creates its caller makes the ordinary charged rise of one, and a stop of its first frame keeps that account ([Limit Stops](limit-stops.md)).
 
 ### Retired ids

@@ -54,7 +54,13 @@ Beyond the base layer's checks, a transaction can carry a body too large for the
 
 - `SATIN-VAL-008` A deposit MUST NOT be rejected for failing a validation check: a deposit that fails any check of this page, or of the base layer, MUST be included as a failed deposit instead (see [Deposit Transactions](deposits.md)).
   A Mega System Transaction is a legacy transaction until it has passed its own chain-id, nonce and EIP-3607 checks, so failing one of those is a rejection; once it has passed them it runs as a deposit, and a check it fails after that includes it as a failed deposit.
-  A read the node fails to make — a database read, a bucket-capacity read, the registry read — is not a validation check, for a deposit as for any transaction: the transaction gets no outcome, as [Halts, Reverts and Stops](../evm/outcomes.md) specifies.
+  A read the node fails to make — a database read, a bucket-capacity read, the registry read — is not a validation check, for a deposit as for any transaction: the transaction gets no outcome, as [Halts, Reverts and Stops](../evm/outcomes.md) specifies, and the node reports it as `SATIN-VAL-010` classifies it.
+- `SATIN-VAL-010` A read a node fails to make for a transaction MUST be reported by its cause, and the transaction MUST NOT be settled, as a failed deposit or otherwise:
+  - a failed bucket-capacity read, always as an internal error of the node (`SATIN-STATE-007`);
+  - a failed database read the transaction's execution makes — in a frame, in the authorization list's simulation or application, or in a charge made before the first frame — as an internal error when the node's database declares the error fatal, and otherwise as an invalid block, as for a pre-block call (`SATIN-PBLK-006`);
+  - a failed read the block's execution makes for the transaction outside its execution — the sender's account before the transaction runs, the L1 block contract's account and the footprint gas scalar before a non-deposit transaction — always as an internal error, as the activation check's is.
+
+  A node that meets such a failure reaches no verdict on the block except the invalid block of the second case, and cannot execute the block past that transaction.
 
 ### Retired rule ids
 

@@ -73,12 +73,12 @@ If it is given back carelessly, a destruction can give back what another transac
 - `SATIN-SD-016` A creation MUST collide when the created address holds non-empty code or a nonce other than zero, and MUST NOT collide on storage alone: [EIP-7610](https://eips.ethereum.org/EIPS/eip-7610) is not applied.
   A creation can therefore land on an address with nonce zero, empty code and storage.
   A slot of such an address that the transaction first accesses once the account is created reads zero and is on a zero row; a slot the state held that the transaction never accessed makes no record when the account is destroyed; a slot the transaction accessed before the creation keeps the value it held, and the destruction deletes it with the account as an ordinary deletion, which makes its write record while it still holds that value.
-- `SATIN-SD-017` An account that is empty under EIP-161 while its leaf is in the state the transaction loaded — nonce zero, balance zero, empty code, storage that is not empty — MUST be the present-leaf row: the creation charges new-account state gas and counts a rise, the address being empty under EIP-161 (`SATIN-STATE-004`, `SATIN-ACCT-014`), and the destruction MUST NOT refill that charge or subtract that rise.
+- `SATIN-SD-017` An account that is empty under EIP-161 while its leaf is in the state the transaction loaded — nonce zero, balance zero, empty code, storage that is not empty — MUST be the present-leaf row: the creation charges new-account state gas and counts a rise, the address being empty under EIP-161 (`SATIN-STATE-004`, `SATIN-STATE-011`, `SATIN-ACCT-014`), and the destruction MUST NOT refill that charge or subtract that rise.
   An address the state holds no account for is absent, never an empty account.
 
 ### The beneficiary and the order of a destruction
 
-- `SATIN-SD-018` A `SELFDESTRUCT` that moves a non-zero balance to a distinct account that does not exist MUST be a rise of state growth and MUST be charged new-account state gas ([State Gas and SALT Pricing](state-gas.md)), a repeated destruction included; a zero balance creates no account and is not a rise.
+- `SATIN-SD-018` A `SELFDESTRUCT` that moves a non-zero balance to a distinct account empty under EIP-161 (`SATIN-STATE-011`) MUST be a rise of state growth and MUST be charged new-account state gas ([State Gas and SALT Pricing](state-gas.md)), a repeated destruction included; a zero balance creates no account and is not a rise.
   That rise MUST be held to the limits only after the operation's give-back, which cannot cross a limit.
   A frame exactly at its state-growth budget that destroys an account created in the transaction, with N new slots, while moving a non-zero balance to a new beneficiary, subtracts `1 + N` when the leaf was absent at the transaction's start and N when it was present, before it adds the beneficiary.
 - `SATIN-SD-019` A `SELFDESTRUCT` MUST proceed in this order:

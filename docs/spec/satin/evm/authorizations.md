@@ -46,10 +46,10 @@ Which authorities a list would create or change depends on the state — whether
 
 - `SATIN-AUTH-008` The totals the list would keep, were it applied, MUST be:
   - one write record for each distinct accepted authority other than the sender, whose account is a fixed record of the body (`SATIN-ACCT-008`), however many of its entries are accepted;
-  - one unit of state growth for each distinct accepted authority whose account does not exist, however many of its entries are accepted;
+  - one unit of state growth for each distinct accepted authority whose account is empty under EIP-161 (`SATIN-STATE-011`), however many of its entries are accepted;
   - the new-account state gas once for each such new authority.
 - `SATIN-AUTH-009` Delegation-indicator state gas MUST be charged at most once per authority, and only when an accepted authorization writes a non-zero delegation designator, the authority holds no delegation indicator at the start of the transaction, and no earlier authorization in the list set one for it.
-  An authority that holds an indicator at the start of the transaction is charged none, a clear and a later non-zero authorization included; a clear charges none; two accepted non-zero authorizations for an authority that holds none at the start charge it once.
+  An authority that holds an indicator at the start of the transaction is charged none, a clear and a later non-zero authorization included; a clear charges none and gives back none, an indicator an earlier authorization of the list set and paid for included; two accepted non-zero authorizations for an authority that holds none at the start charge it once.
   An authorization with a zero delegation target still bumps the nonce and can create the account, and charges no indicator.
   The indicator is not a unit of state growth.
 
@@ -66,11 +66,13 @@ Which authorities a list would create or change depends on the state — whether
 ### A list that fits
 
 - `SATIN-AUTH-014` A list that fits MUST be applied as EIP-7702 applies it, which warms every authority whose account the application loads: an entry skipped for its chain id, for a nonce of `2^64 − 1` or for a signature that does not recover an authority is not loaded and is not warmed; an entry skipped because its authority's code is not a delegation, or because its nonce does not match, is loaded before that check, and its authority is warmed.
-- `SATIN-AUTH-015` The authorities' state gas, their `ACCOUNT_WRITE` ([Gas Schedule and Intrinsic Gas](gas-schedule.md)) and the history of their write records MUST be charged when the list is applied, and reduce what the first frame is given.
+- `SATIN-AUTH-015` The authorities' state gas, their `ACCOUNT_WRITE` ([Gas Schedule and Intrinsic Gas](gas-schedule.md)) and the history of their write records MUST be charged when the list is applied, in the order of `SATIN-SCHED-008`, and reduce what the first frame is given.
+  `ACCOUNT_WRITE` MUST be charged only for an authority whose account write the transaction has not paid already: not for the sender, not for the recipient of a transaction that carries a non-zero value, and not for an authority an earlier applied authorization wrote.
+  An EIP-7702 transaction from A that sends 1 wei to an existing B, with empty calldata and access list, whose one authorization by B carries B's current nonce and a zero delegation target, therefore costs 68,504 gas before its first frame — 21,000 of intrinsic base and value cost, 7,816 for the entry, and `(310 + 101 + 40) × 88` of history for the body, the entry and B's one write record, which the value to B does not make again (`SATIN-ACCT-009`) — and no `ACCOUNT_WRITE`, no indicator and no new-account state gas.
   If one of those charges cannot be paid, the transaction MUST take the pre-frame out-of-gas path of `SATIN-SCHED-009`: the authorizations are taken back, and for a transaction other than a deposit this is an out-of-gas halt, not a limit stop.
   The limit is decided before those charges, so a list that does not fit never takes that path.
 - `SATIN-AUTH-016` When the list fits, a later stop or revert of the first frame MUST keep the authorizations, with their state gas, their write records and the history those records cost (`SATIN-STOP-011`).
-- `SATIN-AUTH-017` The caller account a deposit creates is not an authorization: it MUST always be created and kept, and, being one account, it cannot by itself cross `TX_STATE_GROWTH_LIMIT` ([Deposit Transactions](../block/deposits.md)).
+- `SATIN-AUTH-017` The caller account a deposit creates is not an authorization and MUST NOT be held to the list rule of this page; it is created, charged and counted as `SATIN-DEP-003` specifies ([Deposit Transactions](../block/deposits.md)).
 - `SATIN-AUTH-018` The list rule MUST be decided during execution, where the authorities are read; it is not a rejection a transaction pool can make before inclusion.
 
 ### Retired ids
@@ -82,7 +84,7 @@ None.
 | Constant                | Value   | Description                                                        |
 | ----------------------- | ------- | ------------------------------------------------------------------ |
 | `PER_AUTH_BASE_COST`    | 7,816   | Intrinsic regular gas of one authorization entry                    |
-| `ACCOUNT_WRITE`         | 9,000   | EIP-8038 account write, charged per applied authority's first write |
+| `ACCOUNT_WRITE`         | 9,000   | EIP-8038 account write, charged for an applied authority's first write unless the transaction already paid it |
 | `WRITE_RECORD_SIZE`     | 40      | Data size of one write record                                      |
 | `TX_KV_UPDATE_LIMIT`    | 500,000 | KV-update limit of one transaction                                 |
 | `TX_STATE_GROWTH_LIMIT` | 1,000   | State-growth limit of one transaction                              |
@@ -90,7 +92,7 @@ None.
 ## Rationale
 
 **Why simulate the whole list before applying any of it?**
-Whether the list fits is a property of the whole list: a later entry for the same authority neither adds an account nor a record, and an authority that already exists adds no growth.
+Whether the list fits is a property of the whole list: a later entry for the same authority neither adds an account nor a record, and an authority that is not empty under EIP-161 adds no growth.
 Deciding before applying anything means a list that does not fit leaves nothing applied, and the node never has to undo part of a list.
 
 **Why every list, and not only a long one?**

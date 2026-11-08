@@ -52,13 +52,13 @@ These endings enforce a size, a payment or a protocol rule, and none of them is 
 
 ### How the transaction's own frame ends
 
-- `SATIN-OUT-013` A halt of the transaction's own frame MUST give the transaction a failed receipt, consume the unspent regular gas and return the reservoir (`SATIN-POOL-017`); for a deposit it is a failed deposit ([Deposit Transactions](../block/deposits.md)).
-- `SATIN-OUT-014` A revert or a limit stop of the transaction's own frame MUST give the transaction a failed receipt and return the unspent regular gas and the reservoir (`SATIN-POOL-017`, `SATIN-STOP-009`); for a deposit it is a revert, not a failed deposit (`SATIN-STOP-010`).
+- `SATIN-OUT-013` A halt of the transaction's own frame ends the transaction as `SATIN-POOL-017` settles it, with a failed receipt; for a deposit it is a failed deposit (`SATIN-DEP-004`, [Deposit Transactions](../block/deposits.md)).
+- `SATIN-OUT-014` A revert of the transaction's own frame ends the transaction with a failed receipt, as `SATIN-POOL-017` settles it, and a limit stop of that frame as `SATIN-STOP-009` settles it; for a deposit either is a revert, not a failed deposit (`SATIN-STOP-010`).
 - `SATIN-OUT-016` A transaction that fails validation MUST report no stop (`SATIN-STOP-003`): a non-deposit is rejected; a deposit, a system deposit refused under Regolith and a deposit whose body is over the data-size limit included, is included as a failed deposit; and a Mega System Transaction is a legacy transaction until it passes its own checks, so failing one of them is a rejection ([Mega System Transactions and the Protocol's Own Transactions](../system-contracts/system-tx.md)).
 
 ### Faults
 
-- `SATIN-OUT-015` A failed bucket-capacity read (`SATIN-STATE-007`) or a failed database read MUST NOT be an outcome of the transaction, for a deposit as for any transaction: the transaction MUST NOT be settled, as a failed deposit or otherwise, and the node MUST report an internal error or an invalid block by the error's cause, as [Transaction Validation and Refusals](../block/transaction-validation.md) specifies.
+- `SATIN-OUT-015` A failed bucket-capacity read (`SATIN-STATE-007`) or a failed database read MUST NOT be an outcome of the transaction, for a deposit as for any transaction: the transaction MUST NOT be settled, as a failed deposit or otherwise, and the node MUST report an internal error or an invalid block by the error's cause, as `SATIN-VAL-010` ([Transaction Validation and Refusals](../block/transaction-validation.md)) classifies it.
 
 ### Outside the specification
 

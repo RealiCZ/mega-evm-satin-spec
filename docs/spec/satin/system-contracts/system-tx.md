@@ -62,7 +62,7 @@ The exemption is only safe if the transactions that receive it are exactly the p
 The shape decides how the transaction is validated, before anything of it runs; it must not depend on what the transaction would do.
 
 **Why is every other transaction from the system address invalid?**
-The Oracle authorizes writes on the sender alone; a system key that could send other transactions could reach the Oracle through them with no validation the system shape gets, or deploy and call arbitrary code fee-free.
+The Oracle authorizes writes on its immediate caller, which for a transaction's own call is the sender; a system key that could send other transactions could reach the Oracle through them with no validation the system shape gets, or deploy and call arbitrary code fee-free.
 Rex6 refused such a transaction with an error that left its block unexecutable when it was a deposit; Satin includes such a deposit as a failed deposit, so the engine no longer relies on the L1 portal refusing deposits from every system address a rotation installs.
 
 **Why validate before promotion?**
