@@ -87,6 +87,7 @@ A page that gathers rules whose detail lives elsewhere — [Halts, Reverts and S
 ### The rule list
 
 - [Satin Rules](rules.md) — every rule id of the section, generated from the pages.
+- [Satin and Glamsterdam](glamsterdam.md) — an informative map of Ethereum's Glamsterdam onto Satin: what Satin adopts, changes and does not take, and the MegaETH mechanisms with no Glamsterdam counterpart.
 
 ## Spec History
 
