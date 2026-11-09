@@ -139,7 +139,7 @@ Rex6 treated it as volatile because its volatile set carried the opcode over wit
 
 **Why does a read whose opcode fails mark nothing, but an Oracle read stand?**
 Rex6 registered a read of the beneficiary's account by `BALANCE`, `EXTCODESIZE`, `EXTCODEHASH`, `EXTCODECOPY` or `SELFDESTRUCT` before charging its access, so a frame that then ran out of gas left the registration standing; Satin marks such a read only once its opcode completed, because the read did not happen: the opcode halts before it loads the account, and the replay skips the same load ([The Stateless Witness](../block/stateless-witness.md)).
-The Oracle read keeps Rex6's order: it is made — the service asked and the slot loaded — before its charge, so the read did happen, and its mark stands with it.
+The Oracle read keeps Rex6's order: it is made — the slot loaded, and the service asked where the read asks it — before its charge, so the read did happen, and its mark stands with it.
 
 **Why are creations not reads?**
 A creation loads its creator to check balance and nonce and its created address to decide the created account's state gas, as a value call checks its caller's balance; neither is a read of the beneficiary's state that another transaction conflicts on, and Rex6 neither marked nor refused a creation.
