@@ -70,7 +70,7 @@ interface IKeylessDeploy {
 | ---- | --------------- | ------- |
 | step-1 | Charge `KEYLESS_DEPLOY_OVERHEAD_GAS` of regular gas | Out of gas |
 | step-2 | The call carries no value | `NoEtherTransfer()`, answered before the call's frame is built (see `SATIN-KEY-018`): no value moves |
-| step-3 | The arguments decode as `(bytes, uint256)`, and the first decodes as a signed legacy transaction that is a creation (`to` empty), carries no chain id, and is followed by no trailing byte | In this order: `MalformedEncoding()` for an encoding that does not decode or has trailing bytes, then `NotContractCreation()` for a transaction with `to` set, then `NotPreEIP155()` for one with a chain id |
+| step-3 | The first argument — the call's arguments decoded as `(bytes, uint256)` when it was recognized (`SATIN-ICPT-006`) — decodes as a signed legacy transaction that is a creation (`to` empty), carries no chain id, and is followed by no trailing byte | In this order: `MalformedEncoding()` for an RLP encoding that does not decode or has trailing bytes, then `NotContractCreation()` for a transaction with `to` set, then `NotPreEIP155()` for one with a chain id |
 | step-4 | The carried transaction's nonce is 0 | `NonZeroTxNonce(uint64)` |
 | step-5 | The initcode is at most `MAX_INITCODE_SIZE` bytes | `InitCodeTooLarge(uint64,uint64)` |
 | step-6 | `gasLimitOverride` (read as `MAX_UINT64` when larger) is at least the signed gas limit | `GasLimitTooLow(uint64,uint64)` |
@@ -158,31 +158,53 @@ None.
 
 **Why a native creation instead of a sandbox?**
 Rex6 ran the signed creation as a separate fee-free transaction with its own resource trackers and merged its state afterwards; its constructor saw the signer as `ORIGIN` and a zero `GASPRICE`, and a limit crossed after it ran halted the outer call.
-A native child creation runs under exactly the rules of every other creation, in the outer transaction's pools and limits, so nothing about a keyless constructor is special but its creator and its address.
+Satin makes the constructor a native child of the outer transaction instead, a design choice: a native child creation runs under exactly the rules of every other creation, in the outer transaction's pools and limits, so nothing about a keyless constructor is special but its creator and its address, and a tracer or inspector follows it as it follows any frame.
+Its constructor therefore sees the outer transaction's `ORIGIN` and `GASPRICE` (`SATIN-KEY-011`), where Rex6's saw the signer and zero; a constructor that stores or branches on either computes another result than under Rex6.
+
+**Why are the signer and the deploy address loaded warm, in the outer transaction's warm set?**
+Rex6's occupancy read of the deploy address did not warm it, and its sandbox ran on an access list of its own.
+Satin's reads enter the outer transaction's state warm (`SATIN-KEY-007`) and the constructor runs in the outer warm set, because the creation is a frame of that transaction and loads its creator and its address when it starts in any case; a constructor's access to an account or slot only the outer transaction warmed is priced warm, where Rex6 priced it cold.
+
+**Why does the constructor run on a child's share of the budgets, under the outer detention?**
+Rex6's sandbox received the parent's remaining resource budget as its own transaction budget and merged its footprint afterwards.
+A native child receives the child share of the call's frame budgets and shares the outer transaction's gas detention (`SATIN-KEY-011`, `SATIN-KEY-016`), as every creation does; a constructor that needs nearly all of what the call has left in a dimension can be stopped where Rex6's sandbox ran, the price of having one set of frame rules.
 
 **Why is the forward not capped at 98/100?**
 The signed gas limit is a promise to the constructor; Rex6's sandbox ran on `min(gasLimitOverride, remaining gas)`, and the call charges nothing after the creation returns, so nothing needs the 2/100 the cap would keep back.
 
 **Why keep the step order?**
-Steps 1 to 13 are Rex6's checks in Rex6's order, so a call that fails several of them names the same error a Rex6 node named; step 14 is a `CREATE`'s own charges, after every check, as an opcode charges after its operands are known.
+Steps 1 to 13 are Rex6's checks in Rex6's order, after the decoding of the call's arguments that decides whether the call is a deployment at all, as in Rex6 (`SATIN-ICPT-006`), so a call that fails several of them names the same error a Rex6 node named; step 14 is a `CREATE`'s own charges, after every check, as an opcode charges after its operands are known.
 
 **Why give the nonce back from 1?**
 The signed transaction carries nonce 0 and the deploy address is derived from the signer and nonce 0.
-A signer at nonce 1 is the state Rex6 left after a deployment that did not deploy code; keeping each attempt's bump would move the signer to 2, where step 8 refuses every later attempt, so one failing submission by anyone would make the address undeployable.
+A signer at nonce 1 is the state Rex6 left after a deployment that did not deploy code; a native creation bumps the signer's real nonce, so keeping each attempt's bump would move the signer to 2, where step 8 refuses every later attempt, and one failing submission by anyone would make the address undeployable.
 Taking the bump back keeps the address deployable until a deployment leaves code there.
+Rex6's sandbox showed the constructor a nonce-1 signer as nonce 0, bumped to 1; under Satin the constructor runs while the signer's real nonce is bumped, 2 for a signer at nonce 1, until the take-back at the call's end, so only a constructor that calls a delegated signer which itself creates observes the difference, in the address that creation derives and in the nonce the signer keeps.
+
+**Rex6 defect fixed.** A signed constructor that returned empty code on a path the submitter chooses — through the gas it is forwarded, for one — left a nonce-1 account without code at the deploy address in Rex6, onto which every later deployment collides, so anyone could make a Nick's-method address undeployable.
+Satin reverts such a creation (`SATIN-KEY-009`), so the address stays free.
 
 **Why refuse empty code at the deploy address?**
 A creation that returns empty code leaves an account with a nonce and no code, onto which every later creation collides.
-Rex6 let such a creation complete; under Satin it reverts, so the address stays free.
 Whether initcode returns empty code depends on what it runs on — the forwarded gas, the outer transaction, the block, the state, the oracle's answers, the SALT capacities — part of which the submitter chooses; refusing the empty deposit removes the incentive to make it return empty code.
 
-**Why are the four errors removed?**
+**Why are the four errors removed, and what does `gasUsed` report?**
 They reported the sandbox's failures (a parent budget, a sandbox validation, the compute-gas limit, a failed read), none of which a native creation has.
-A failed read is a fault of the node, never an answer of a transaction.
+Rex6 executed a second transaction and reported its settled gas, the inner transaction's intrinsic gas, refund and floor included, and refused an inner gas limit below that intrinsic gas with `InvalidTransaction()`; a native creation has no intrinsic gas of its own, so step 14 charges what a `CREATE` charges for its start and `gasUsed` reports the creation's own spend before the refund (`SATIN-KEY-015`), and a short constructor's `gasUsed` differs from Rex6's.
+
+**Rex6 defect fixed.** A database or SALT read that failed in Rex6's sandbox — of the signer's or the deploy address's account, or of a bucket's capacity — became the transaction's result, a revert with `InternalError()`, so a node whose read failed recorded a failed deployment where a node holding the data executed it.
+Satin gives such a transaction no outcome: a failed read is a fault of the node, never an answer of a transaction (`SATIN-KEY-017`, [Transaction Validation and Refusals](../block/transaction-validation.md)).
+
+**Rex6 defect fixed.** Rex6's text promised that every call to KeylessDeploy the node did not intercept reverts with `NotIntercepted()`, yet a contract's `keylessDeploy` call carrying value reverted with empty data, the method not being payable, and `version()` answered.
+Satin states what the unchanged bytecode does (`SATIN-KEY-003`).
+
+**Rex6 defect fixed.** A fresh keyless signer was counted as one unit of state growth before a later refusal — `GasLimitTooLow`, the deploy address's code, `InsufficientBalance` — although no signer account was created, so the block's growth count, and its budget, carried an account that does not exist.
+Satin counts the signer's growth only after the creation's nonce bump stands (`SATIN-KEY-012`); the state gas charged for the signer is given back on a refusal (`SATIN-KEY-004`).
 
 **Why does step 9 follow the EIP-3607 switch?**
 The signer is the sender of the signed creation, and EIP-3607 is the rule that refuses a sender with code; a node's configuration can switch it off for a user transaction in a simulation, and the deployment follows the same switch, loading no signer code when it is off.
 Block execution never switches EIP-3607 off, so a block's deployments always make step 9.
+Rex6, too, loaded no signer code with the check off, except for a signer already in its state without its code, whose code it loaded; Satin loads none in every case.
 
 ## Security Considerations
 
@@ -196,4 +218,4 @@ Block execution never switches EIP-3607 off, so a block's deployments always mak
 
 - [Rex2](../../upgrades/rex2.md) — Introduced KeylessDeploy, executed in a sandbox.
 - [Rex6](../../upgrades/rex6.md) — The Rex6 deployment, a sandboxed transaction merged into the outer one, is specified in [KeylessDeploy](../../system-contracts/keyless-deploy.md).
-- [Satin](../../upgrades/satin.md) — Deployment as a native child creation, the nonce take-back from 1, the empty-code refusal, and four errors removed.
+- [Satin](../../upgrades/satin.md) — Deployment as a native child creation, in the outer transaction's context, warm set, budgets and detention; the nonce take-back from 1, the empty-code refusal, `gasUsed` without intrinsic gas, four errors removed, and the signer's growth counted only once it stands.

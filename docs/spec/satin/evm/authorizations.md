@@ -60,7 +60,7 @@ Which authorities a list would create or change depends on the state — whether
   Data size cannot be crossed here, since validation refuses a body that, with `WRITE_RECORD_SIZE` bytes for each authorization entry, exceeds the data-size limit ([Transaction Validation and Refusals](../block/transaction-validation.md)), and compute does not apply.
 - `SATIN-AUTH-011` A skipped list MUST keep no authority account, no authority write record, no authority state gas and no authority history; no delegation is written, and no authority nonce is bumped beyond the sender's validation bump.
   The intrinsic regular gas, the body's history gas and the body's data size stay.
-- `SATIN-AUTH-012` On a skip the authorities the simulation consulted MUST NOT be made warm, except one already warm from the transaction's start: the sender, the recipient of a call, the block beneficiary, an access-list address, a precompile, or the `SequencerRegistry`'s account ([Gas Schedule and Intrinsic Gas](gas-schedule.md)).
+- `SATIN-AUTH-012` On a skip the authorities the simulation consulted MUST NOT be made warm, except one already warm from the transaction's start: the sender, the recipient of a call, the block beneficiary, an access-list address or a precompile ([Gas Schedule and Intrinsic Gas](gas-schedule.md)).
 - `SATIN-AUTH-013` The skip MUST be all or nothing, including an authority that would have fitted by itself, and MUST be settled as a revert-class stop of the transaction's own frame, which settles as `SATIN-STOP-009` states ([Limit Stops](limit-stops.md)).
 
 ### A list that fits

@@ -10,13 +10,12 @@ maturity: unstable
 **Unstable** — Satin is under active development: everything on this page may change before Satin is frozen.
 {% endhint %}
 
-Abstract: When Satin takes effect and how a chain configuration schedules it; the base forks that must be active when it does; the activation block, which admits only deposits and checks that the chain holds the system contracts and the EIP-7997 factory Satin runs on; the parts of the execution configuration the spec fixes whatever a node supplies; and what Satin requires of the state the Rex era left.
+Abstract: When Satin takes effect and how a chain configuration schedules it, on the spec ladder and from genesis; the base forks that must be active when it does; the activation block, which admits only deposits and checks that the chain holds the EIP-7997 factory Satin runs on; the parts of the execution configuration the spec fixes whatever a node supplies; and what Satin requires of the state the Rex era left.
 
 ## Motivation
 
-The spec restates the execution layer; it does not deploy or migrate anything.
-It therefore runs only on a chain that already holds what it expects — the six system contracts at known code, the `CREATE2` factory, the L1 block contract — and on a base whose forks are all active by the time it starts.
-A node that started the spec at another block, ran it on a chain without those contracts, or took a protocol value from its own configuration, would execute a different chain from every other node, and the difference might only show long after activation.
+The spec restates the execution layer on a chain that holds what it expects: the system contracts, which every block deploys where they are missing or altered, the `CREATE2` factory and the L1 block contract, which Satin does not deploy, and a base whose forks are all active by the time it starts.
+A node that started the spec at another block, ran it on a chain without the factory, or took a protocol value from its own configuration, would execute a different chain from every other node, and the difference might only show long after activation.
 
 ## Specification
 
@@ -25,6 +24,10 @@ A node that started the spec at another block, ran it on a chain without those c
 - `SATIN-ACT-001` Satin follows Rex6 on the spec ladder.
   A node MUST execute every block whose timestamp is at or after `satinTime` under Satin, and every earlier block under the spec its timestamp resolves to.
   The block in which Satin activates is the block whose timestamp is at or after `satinTime` and whose parent's timestamp is before it (see [Base Layer](../base-layer.md), `SATIN-BASE-007`).
+- `SATIN-ACT-011` A chain configuration that schedules Satin MUST schedule every Mega spec below it on the spec ladder — MiniRex, Rex, Rex1, Rex2, Rex3, Rex4, Rex5 and Rex6 — each at or before the timestamp of the spec above it, and MAY omit only the alias specs MiniRex1 and MiniRex2, which carry no setup of their own.
+  A Satin block deploys every system contract whatever earlier specs the configuration scheduled (`SATIN-SYSC-003`), so what a block sets up before its transactions follows from its place on the ladder.
+- `SATIN-ACT-012` Satin MAY be active from genesis, `satinTime` at or before the genesis block's timestamp, as Rex6 may be.
+  Such a chain has no block in which Satin activates: none of its blocks admits only deposits for Satin's sake or checks the factory, and the pre-block sequence of its first block installs every system contract the genesis state does not hold and seeds a SequencerRegistry it does not hold from the configuration's bootstrap values (`SATIN-SYSC-003`, `SATIN-REG-008`, `SATIN-REG-009`); the genesis block itself makes no EIP-2935 or EIP-4788 call (`SATIN-PBLK-003`).
 - `SATIN-ACT-008` Satin MUST NOT change how a block before `satinTime` executes: a node replaying history MUST resolve each block's spec from its timestamp and apply that spec's rules.
   From `satinTime` on, every account, contract and slot the earlier blocks left MUST be executed under Satin's rules: accounts, code and storage carry over unchanged and run under Satin's prices, pools and limits.
   A contract deployed under an earlier spec is not promised the outcome it had under that spec for the same gas: a gas budget fixed for Rex prices — a gas argument, a stored per-call limit, a signed gas limit — can be too small under Satin's prices — by about five times for a call that writes a fresh slot or creates an account without a reservoir — or larger than needed, as for deployed code, whose price per byte fell ([Two-Pool Gas](../evm/gas-model.md), [State Gas and SALT Pricing](../evm/state-gas.md)).
@@ -32,41 +35,32 @@ A node that started the spec at another block, ran it on a chain without those c
 ### The chain configuration
 
 - `SATIN-ACT-002` A chain configuration's `config` object MUST schedule Satin by one key, `satinTime`, whose value is the activation timestamp: an unsigned integer of at most `MAX_TIMESTAMP`, given as a JSON number.
-  Satin carries no parameter: no key names a limit, a detention cap, a price, or the SequencerRegistry's roles.
+  Satin carries no parameter of its own: no key names a limit, a detention cap or a price, and the SequencerRegistry's bootstrap values are the keys the Rex era introduced (see [SequencerRegistry](../system-contracts/sequencer-registry.md), `SATIN-REG-009`).
   A node MUST refuse a configuration that carries a key starting with `satin`, in any ASCII letter case, that is not exactly `satinTime`, whether or not it also carries `satinTime`.
   A key given twice MUST be read as its last copy.
 - `SATIN-ACT-003` Every base fork Satin runs on — the Ethereum forks from Shanghai to Osaka and the Optimism forks from Regolith to Karst — MUST be active at `satinTime`, and a node MUST refuse a configuration that schedules Satin and leaves one of them inactive at `satinTime`.
 - `SATIN-ACT-010` A node MUST work out, for every block it builds or validates, whether the block admits only deposits (`SATIN-BASE-006`) and whether Satin activates in it, from the chain configuration and the parent block's timestamp, and MUST execute the block accordingly; neither may be left to an input a caller can omit.
-  The two differ: an Optimism fork's activation block admits only deposits and checks no predeploy.
+  The two differ: an Optimism fork's activation block admits only deposits and checks no factory.
 
 ### The activation block
 
-- `SATIN-ACT-004` The block in which Satin activates MUST admit only deposits (`SATIN-BASE-006`), and MUST make the predeploy check of `SATIN-ACT-005` as the third step of its pre-block sequence, before its first transaction (see [System Calls and the Pre-Block Sequence](system-calls.md)).
-- `SATIN-ACT-005` The predeploy check MUST read, in this order, the six system contracts in address order — Oracle, High-Precision Timestamp, KeylessDeploy, MegaAccessControl, MegaLimitControl, SequencerRegistry — and then the [EIP-7997](https://eips.ethereum.org/EIPS/eip-7997) `CREATE2` factory at `CREATE2_FACTORY_ADDRESS`, and each MUST hold an account whose code hash is the one the table below names.
-  Their nonces, balances and storage are not checked.
-  An address with no account, an account without code, an older version of its contract or any other code MUST make the block invalid.
-  The check writes nothing: each account it reads is a read-only entry of the activation block's pre-block states, in the order above (see [The Stateless Witness](stateless-witness.md)).
-  No other block reads the seven addresses before its transactions.
-
-| Address                            | Code hash                            |
-| ---------------------------------- | ------------------------------------ |
-| `ORACLE_CONTRACT_ADDRESS`          | `ORACLE_CODE_HASH` (version 2.0.0)   |
-| `HIGH_PRECISION_TIMESTAMP_ADDRESS` | `HIGH_PRECISION_TIMESTAMP_CODE_HASH` |
-| `KEYLESS_DEPLOY_ADDRESS`           | `KEYLESS_DEPLOY_CODE_HASH`           |
-| `MEGA_ACCESS_CONTROL_ADDRESS`      | `MEGA_ACCESS_CONTROL_CODE_HASH`      |
-| `MEGA_LIMIT_CONTROL_ADDRESS`       | `MEGA_LIMIT_CONTROL_CODE_HASH`       |
-| `SEQUENCER_REGISTRY_ADDRESS`       | `SEQUENCER_REGISTRY_CODE_HASH` (version 2.0.0) |
-| `CREATE2_FACTORY_ADDRESS`          | `CREATE2_FACTORY_CODE_HASH`          |
-
-  The addresses and the six contracts' code hashes are those of [System Contracts](../system-contracts/overview.md).
+- `SATIN-ACT-004` The block in which Satin activates MUST admit only deposits (`SATIN-BASE-006`), and MUST make the factory check of `SATIN-ACT-005` as the third step of its pre-block sequence, before the system contracts are deployed and before its first transaction (see [System Calls and the Pre-Block Sequence](system-calls.md)).
+- `SATIN-ACT-005` The factory check MUST read the [EIP-7997](https://eips.ethereum.org/EIPS/eip-7997) `CREATE2` factory at `CREATE2_FACTORY_ADDRESS`, which MUST hold an account whose code hash is `CREATE2_FACTORY_CODE_HASH`; its nonce, balance and storage are not checked.
+  An address with no account, an account without code, or any other code MUST make the block invalid.
+  The check writes nothing: the account it reads is a read-only entry of the activation block's pre-block states (see [The Stateless Witness](stateless-witness.md)).
+  No other block reads the factory before its transactions.
+  The system contracts are not checked: every block, the activation block included, deploys them (`SATIN-SYSC-003`).
 
 ### Carry-over
 
-- `SATIN-ACT-006` Satin MUST NOT deploy, upgrade or seed any account: a chain runs Satin on the six system contracts and the factory as its state holds them when Satin activates, and the predeploy check refuses a chain whose state does not hold them at the code above.
 - `SATIN-ACT-007` Satin MUST NOT upgrade or write the L1 block contract: it runs on the contract the chain holds, which on a chain coming from the Rex era is OP's L1Block version 1.6.0 (Isthmus), whose data-availability footprint gas scalar and operator fee scalars are zero until the contract is upgraded and the scalars are set.
 - `SATIN-ACT-009` Part of the execution configuration is fixed by the spec, whatever a node supplies: the Satin gas schedule and the byte prices of state and history gas; EIP-8037, EIP-2780 and EIP-7708 on; the execution cap; the chain-id check on; the code and initcode size limits; the per-transaction limits, the per-frame share and the detention caps; and the block's packing budgets.
   A node MUST execute every Satin block on these values and on no value its configuration or a block names, and a node that reads the configuration before it executes — to estimate gas against the execution cap, for one — MUST read these values.
   The values are those of the pages that state the rules: [Gas Schedule and Intrinsic Gas](../evm/gas-schedule.md), [State Gas and SALT Pricing](../evm/state-gas.md), [History Gas](../evm/history-gas.md), [Two-Pool Gas](../evm/gas-model.md), [Contract Size Limits](../evm/contract-limits.md), [Resource Limits](../evm/resource-limits.md), [Gas Detention](../evm/gas-detention.md), [Transaction Validation and Refusals](transaction-validation.md) and [Block Limits and Packing](block-limits.md).
+
+### Retired ids
+
+- `SATIN-ACT-006` Retired, replaced by `SATIN-SYSC-003` and `SATIN-REG-008`: every block deploys the system contracts, as Rex6 does, and the activation block checks only the factory (`SATIN-ACT-005`).
 
 ## Constants
 
@@ -81,6 +75,7 @@ A node that started the spec at another block, ran it on a chain without those c
 **Why one key and no parameter?**
 Every value Satin executes on is the spec's; a configuration that could name a limit or a role would let two chains run different rules under one spec name.
 Refusing every other key that starts with `satin` keeps a file written against an earlier draft of the format — which named the registry's roles (`satinInitialSystemAddress`, `satinInitialSequencer`, `satinInitialAdmin`, `satinMinRotationDelay`), `satinInitialFromBlock` or the limits — from loading as if it were valid.
+The registry's bootstrap values are not Satin's: they are the keys Rex5 and Rex6 introduced, which a configuration carries for the registry's deployment whatever spec runs.
 The key format is provisional until a network publishes a genesis file carrying it.
 Some JSON readers hand a large number over as an object rather than a number; how a node reads such a representation is node documentation.
 
@@ -89,13 +84,16 @@ Every Satin block executes on Karst's rules; a Satin block before one of its bas
 Whether Jovian, Karst or Osaka activate before `satinTime` is not the execution layer's to check: every block before `satinTime` runs the Rex-era engine, which builds on Isthmus whatever the configuration times those forks at.
 
 **Why must the executor work out the activation flags itself?**
-Block validity must not depend on a caller remembering to pass a flag: an execution not told that a block admits only deposits would accept a user transaction in it, and one not told that Satin activates would check no predeploy.
+Block validity must not depend on a caller remembering to pass a flag: an execution not told that a block admits only deposits would accept a user transaction in it, and one not told that Satin activates would check no factory.
 Both follow from the configuration and the parent's timestamp, which the executor is given.
 
-**Why check the predeploys rather than deploy them?**
-A chain reaches Satin through the Rex-era forks, which installed the six system contracts: Rex5 deployed the SequencerRegistry and upgraded the Oracle to 2.0.0, and Rex6 upgraded the SequencerRegistry to 2.0.0; OP's genesis tooling gave the chain the factory.
-Checking that they are there, once, fails closed on a chain that did not run those forks, without rewriting state a chain that did run them holds.
-A chain must therefore have run a Rex6 block before `satinTime`.
+**Why deploy the system contracts, and check only the factory?**
+Rex6 deploys the system contracts in every block — installing a missing one, rewriting one whose code differs, seeding a new registry — and Satin keeps that rule, so a chain need not have run a Rex6 block before `satinTime`: Satin can be active from genesis, as Rex6 can.
+The factory is not a MegaETH contract, and neither Rex6 nor Satin deploys it: Rex6 assumes the one OP's genesis tooling and the Canyon fork give the chain, while Satin, which takes EIP-7997, checks it once, in the activation block, and fails closed on a chain that lacks it.
+
+**Why must a configuration climb the ladder?**
+Each Mega spec's setup — the contracts it deploys, the rules of its pre-block steps — is part of what the specs above it run on; a configuration that skipped a rung would describe a chain whose history no node executes.
+The alias specs carry no setup, so a network may leave them out, as under Rex6.
 
 **Why does the compatibility statement promise the state carries over, and not that contracts behave the same?**
 Satin changes nothing about earlier blocks, and every account, its code and its storage carry over; but a contract deployed under Rex6 runs, from `satinTime`, under Satin's prices, pools, `GAS` value and transfer logs, so it does not behave identically.
@@ -109,7 +107,7 @@ A node that let its configuration override a price, a limit or a check would com
 ## Security Considerations
 
 - A node that activates Satin at another block than the schedule implies applies Satin's rules to a Rex6 block or Rex6's to a Satin block, and computes another state from there on.
-- A node that skips the predeploy check runs Satin on a chain whose system contracts may be missing or carry other code, so the Oracle's authority or the live system address could be anyone's.
+- A node that skips the factory check runs Satin on a chain without the `CREATE2` factory EIP-7997 promises, a chain every other node refuses.
 - A node that reads a limit or a price from its configuration diverges from every node that holds the spec's value.
 - A node that relies on its caller to say whether a block admits only deposits accepts an activation block with user transactions when the caller forgets.
 
@@ -117,4 +115,4 @@ A node that let its configuration override a price, a limit or a check would com
 
 - [Rex5](../../upgrades/rex5.md) — Deployed the SequencerRegistry and upgraded the Oracle to 2.0.0.
 - [Rex6](../../upgrades/rex6.md) — Upgraded the SequencerRegistry to 2.0.0; Rex6 deploys the system contracts as specified in [System Contracts](../../system-contracts/overview.md).
-- [Satin](../../upgrades/satin.md) — Activation by `satinTime`, the deposit-only activation block with the predeploy check, and the configuration fixed by the spec.
+- [Satin](../../upgrades/satin.md) — Activation by `satinTime` or from genesis, the deposit-only activation block with the factory check, Rex6's deployment of the system contracts in every block, and the configuration fixed by the spec.

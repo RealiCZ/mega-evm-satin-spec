@@ -55,7 +55,7 @@ Compute is regular gas; the reservoir pays only state and history gas, and a fra
 
 **Why one figure?**
 A contract needs one number — how much it can still spend — and the lesser of the two is the only one that predicts when it will be stopped.
-Rex6 answered the lesser of a per-frame compute budget and the detained transaction limit; Satin has no compute-gas budget beyond regular gas and detention.
+Rex6 answered the lesser of a per-frame compute budget and the detained transaction limit; Satin has no compute-gas budget beyond regular gas and detention, and Rex6's per-frame budget could report more compute than a child forwarded little gas can pay for, so the answer is now bounded by the caller's own regular gas.
 
 ## Security Considerations
 

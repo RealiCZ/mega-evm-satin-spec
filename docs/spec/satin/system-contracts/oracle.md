@@ -1,5 +1,5 @@
 ---
-description: Satin (unstable) — Oracle. The Oracle system contract under Satin; how an SLOAD in its own frame is answered by the oracle service, what such a read costs, and when a sendHint reaches the service and what it counts.
+description: Satin (unstable) — Oracle. The Oracle system contract under Satin; how an SLOAD in its own frame is answered by the oracle service, what such a read costs, how a served value is persisted before its reader, and when a sendHint reaches the service and what it counts.
 spec: Satin
 maturity: unstable
 ---
@@ -10,12 +10,12 @@ maturity: unstable
 **Unstable** — Satin is under active development: everything on this page may change before Satin is frozen.
 {% endhint %}
 
-Abstract: The Oracle system contract: its address, code and interface; how an `SLOAD` in the Oracle's own frame is answered by the node's oracle service; what such a read costs and loads; and when a `sendHint` call reaches the service, and what it counts as data size.
+Abstract: The Oracle system contract: its address, code and interface; how an `SLOAD` in the Oracle's own frame is answered by the node's oracle service; what such a read costs and loads; how the sequencer persists a value the service gave before the transaction that read it, and which transactions it cannot persist; and when a `sendHint` call reaches the service, and what it counts as data size.
 
 ## Motivation
 
 MegaETH serves externally sourced data — a sub-second timestamp, among others — from the Oracle's storage, filled lazily: a value is fetched from the node's oracle service when a transaction reads it, not written for every block in advance.
-A read answered by a service rather than by the state is a read every node must answer, price and record identically, or the transaction's result depends on the node it runs on.
+A read answered by a service rather than by the state is a read every node must answer and price identically, and whose value the block itself must carry, or the transaction's result depends on the node it runs on.
 A hint is a payload a contract hands the service so that it fetches a value before the read; it leaves the node, so it cannot be taken back, and it costs the node work whether or not it decodes.
 Without exact rules for when a read asks the service, what it costs, and when a hint is admitted and what it counts, two nodes compute different gas, different data size and different stops for the same transaction.
 
@@ -28,29 +28,39 @@ Without exact rules for when a read asks the service, what it costs, and when a 
   - **Reads.** `getSlot(uint256 slot) returns (bytes32 value)` returns the value at `slot`; `getSlots(uint256[] slots) returns (bytes32[] values)` returns the values at `slots`, in order. Both read by `SLOAD` in the Oracle's own frame.
   - **Restricted writes.** `setSlot(uint256 slot, bytes32 value)`, `setSlots(uint256[] slots, bytes32[] values)`, `emitLog(bytes32 topic, bytes data)` and `emitLogs(bytes32 topic, bytes[] dataVector)` write the slots or emit the logs, and then revert with `NotSystemAddress()` unless the immediate caller is the address `SequencerRegistry.currentSystemAddress()` returns (see [SequencerRegistry](sequencer-registry.md)). The body — every `SSTORE`, `LOG` and loop iteration — runs before that check and is charged as it runs; the revert takes back every write and log. `setSlots` with arrays of different lengths reverts with `InvalidLength(uint256 slotsLength, uint256 valuesLength)` before any `SSTORE` and before the check.
   - **Auxiliary.** `multiCall(bytes[] data) returns (bytes[] results)` executes each payload by `DELEGATECALL` into the Oracle and returns the results in order; at the first payload that fails it reverts with that payload's revert data when the data are not empty, and with `Error(string)` carrying `"Multicall: call failed"` when they are empty; `sendHint(bytes32 topic, bytes data)` is a no-op `view` method at the bytecode level.
-- `SATIN-ORCL-011` The Oracle authorizes a write on its immediate caller alone: a write reaches its storage only from a frame whose caller is the live system address, whatever sent the transaction.
-  Every transaction from that address other than a Mega System Transaction is invalid (see [Mega System Transactions](system-tx.md)), so among the transactions whose own frame calls the Oracle, only a Mega System Transaction writes it.
-  Any transaction can still write it through code running at the live system address: through the [High-Precision Timestamp](high-precision-timestamp.md)'s `update` while that contract is the live system address (`SATIN-HPTS-001`), or through the code an EIP-7702 delegation of the system address runs, a deposit included; the registry accepts any non-zero address as the system address (`SATIN-REG-001`).
+- `SATIN-ORCL-011` A restricted write MUST be authorized as the Oracle's bytecode authorizes it, and by no further rule of the node's: once the body has run, the write stands when the immediate caller of the Oracle's frame is the address `SequencerRegistry.currentSystemAddress()` returns, and the call reverts with `NotSystemAddress()` otherwise, whatever sent the transaction and whatever the transaction's type.
+  The sequencer writes the Oracle through Mega System Transactions (see [Mega System Transactions](system-tx.md)); code running at the live system address writes it as well — the [High-Precision Timestamp](high-precision-timestamp.md)'s `update` while that contract is the live system address (`SATIN-HPTS-001`), or the code an EIP-7702 delegation of the system address runs, a deposit's call among them — since the registry accepts any non-zero address as the system address (`SATIN-REG-001`).
 
 ### Oracle reads
 
 - `SATIN-ORCL-002` An `SLOAD` executed in the Oracle's own frame — a frame whose storage is the Oracle's: a frame running at the Oracle's address, the frames of `multiCall`'s `DELEGATECALL`s of the Oracle into itself included, and not a `DELEGATECALL` from another account into the Oracle's code, which runs on that account's storage — MUST load the slot from the state through the transaction's journal, then ask the node's oracle service for the slot, and push the service's value when the service gives one and the loaded value otherwise.
   The service's value MUST win over whatever the slot holds at the read, a value the Oracle's own frame wrote earlier in the transaction included; with no value from the service the read MUST push the slot's present value, that write included.
-  Every read that asks the service MUST be recorded on the transaction's outcome with the service's answer, an answer of none included (see [The Stateless Witness](../block/stateless-witness.md)).
 - `SATIN-ORCL-003` Every such read MUST be charged as a cold storage access, `COLD_SLOAD_COST`, however often the slot was read before, and the slot MUST be loaded whichever source answers, so that a later access finds it warm and a stateless witness carries it.
   The read is a read of volatile data for [gas detention](../evm/gas-detention.md), under the Oracle's cap.
-- `SATIN-ORCL-004` A frame whose regular gas, its withheld part included, cannot pay the cold access MUST run out of gas at the `SLOAD` without loading the slot and without asking the service.
-  A frame whose whole regular gas can pay it MUST load the slot and ask the service before the cold access is charged.
-  When that charge is then gas detention's crossing (`SATIN-DET-018`) — the spendable part cannot pay it — the frame is stopped and the `SLOAD` does not complete, but the slot stays loaded, the service's answer stays recorded on the transaction's outcome (`SATIN-ORCL-002`), and the read is not marked for gas detention (`SATIN-DET-003`).
-  A read refused because the frame's volatile-data access is off (see [MegaAccessControl](mega-access-control.md)) MUST NOT ask the service either.
-- `SATIN-ORCL-005` During a system call the node MUST NOT ask the oracle service: an `SLOAD` in the Oracle's own frame MUST push the slot's value on the chain, MUST be loaded and priced as any Oracle read is, and MUST record no answer.
-  The rule ends with the system call; a Mega System Transaction is a transaction, not a system call, and its reads ask the service.
+- `SATIN-ORCL-004` The read MUST be made before the cold access is charged: the slot is loaded, the service asked, and the read marked for gas detention (`SATIN-DET-003`), and only then is `COLD_SLOAD_COST` charged.
+  A frame whose regular gas, its withheld part included, cannot pay the cold access MUST therefore load the slot, ask the service and mark the read, and then run out of gas at the `SLOAD`; the mark MUST stand for the rest of the transaction, though the frame halts.
+  When the charge is gas detention's crossing (`SATIN-DET-018`) — the spendable part cannot pay it but the whole regular gas can — the frame is stopped and the `SLOAD` does not complete, and the slot stays loaded and the read marked all the same.
+  A read refused because the frame's volatile-data access is off (see [MegaAccessControl](mega-access-control.md)) MUST NOT ask the service, and marks nothing.
+- `SATIN-ORCL-005` During a system call, and for every transaction of the block in which Satin activates, the node MUST NOT ask the oracle service: an `SLOAD` in the Oracle's own frame MUST push the slot's value on the chain, and MUST be loaded, priced and marked as any Oracle read is.
+  The rule for a system call ends with the system call; a Mega System Transaction is a transaction, not a system call, and its reads ask the service.
+  The block in which Satin activates admits only deposits (see [Base Layer](../base-layer.md), `SATIN-BASE-008`), so no Mega System Transaction in it can persist a value before a reader.
+
+### Persistence of served values
+
+- `SATIN-ORCL-012` For a transaction the block includes, every value the oracle service gave one of its Oracle reads that the transaction's own writes do not explain MUST be persisted on-chain by a [Mega System Transaction](system-tx.md) the sequencer inserts, which calls `setSlot` or `setSlots` and MUST be ordered before that transaction, so that every node replaying the block observes the same storage state.
+  The transaction's own writes explain a served value when the slot's present value at the read is one the transaction itself wrote to the slot earlier in it — by a restricted write the Oracle authorized (`SATIN-ORCL-011`) and no revert has taken back — and that value is the value served: the replay of the read pushes that write, and nothing written before the transaction need hold the value.
+  A node that validates or replays a block runs no oracle service: each Oracle read it makes has no value from the service and pushes the slot's present value (`SATIN-ORCL-002`), which the Mega System Transactions before the reading transaction wrote, or, after a write of the transaction's own to the slot, that write.
+  A transaction is therefore not included when a value this rule requires for it cannot be persisted before it in the block, its Mega System Transaction being skipped or refused.
+- `SATIN-ORCL-013` A transaction MUST NOT be included in a block when an Oracle slot it reads has no value that, written before the transaction, would make the transaction's replay push at each of its reads of that slot what its execution pushed, the replay's read pushing the slot's present value, a write the transaction made to the slot earlier in it included (`SATIN-ORCL-002`).
+  A transaction is left out by this rule only then: one for which such a value exists for every slot it reads is not.
+  A transaction that reads a slot the service answers, then sends a hint that has the service fetch another value, and then reads the slot again, answered that other value, with no write of its own to the slot between, is left out: one slot answers it two values, and no single value written before it reproduces both.
+  A transaction that reads a slot the service answers 7, writes 8 to it by a restricted write the Oracle authorizes, and reads it again, answered 8, is not: the value 7 written before it reproduces the first read, and the second pushes the transaction's own write, which explains the value 8 (`SATIN-ORCL-012`).
 
 ### Hints
 
 - `SATIN-ORCL-008` Only a `CALL` or a `STATICCALL` whose target is the Oracle and whose input's first four bytes are the selector of `sendHint(bytes32,bytes)` is a `sendHint` call.
   A `CALLCODE` or `DELEGATECALL` of the method — `multiCall`'s payloads among them — runs the Oracle's bytecode in a frame of the caller's own context, MUST NOT reach the service and MUST count nothing.
-- `SATIN-ORCL-006` A `sendHint` call MUST be admitted, and its hint forwarded to the oracle service synchronously, when it is called, before the call returns, only when all of the following hold: the call is forwarded more than zero gas, it carries no value, and the frame that makes it has its volatile-data access on (see [MegaAccessControl](mega-access-control.md)).
+- `SATIN-ORCL-006` A `sendHint` call MUST be admitted, and its hint forwarded to the oracle service synchronously, when it is called, before the call returns, only when both of the following hold: the call is forwarded more than zero gas, and the frame that makes it has its volatile-data access on (see [MegaAccessControl](mega-access-control.md)); whether the call carries value does not matter.
   A call that fails any of them MUST drop the hint and count nothing.
   Whether admitted or not, the call then runs the Oracle's bytecode, but in the case of the rule `SATIN-ORCL-010` below.
 - `SATIN-ORCL-007` The service MUST be handed the hint's `topic`, its `data`, and the address of the frame that made the call: the transaction's sender for a `sendHint` that is the transaction's own call.
@@ -80,25 +90,42 @@ The value a frame wrote itself is only the contract's storage, which only the sy
 The answer can differ between two reads of the same slot — a hint in between can have the service fetch another value — so the second read is no cheaper for the node than the first.
 A fixed price also makes the read's cost independent of how warm the slot happens to be.
 
-**Why does the slot load even when the service answers?**
-So that the read lands in the transaction's read set: a stateless validator that answers from the slot needs it, and a later write in the same transaction finds it warm as on every other node.
+**Rex6 defect fixed.** With slot `s` holding 7 and the service also answering 7, a transaction calling `multiCall([getSlot(s), setSlot(s, 8)])` paid the cold price for the `SSTORE` on a node that ran a service, which did not load the slot when the service answered, and the warm price on a replaying node, which loaded it at the read, so the two computed a different gas used.
+Satin loads the slot at every Oracle read, whichever source answers (`SATIN-ORCL-003`), so the read lands in the transaction's read set and a later access finds the slot warm on every node.
+
+**Why must a served value be on-chain before its reader?**
+A node that validates or replays the block has no service; it reads every Oracle value from the slot, so the value the service gave the sequencer must be in the slot when the read runs: written before the reading transaction by a Mega System Transaction, or written by the reading transaction itself earlier in it.
+Rex6 put this obligation on the sequencer, and Satin keeps it: the block carries the values, and nothing beside the block carries the service's answers.
+Rex6 states the obligation for every value the service gives; Satin states it for every value the reading transaction's own writes do not explain (`SATIN-ORCL-012`), because the replay of a read after such a write pushes the write (`SATIN-ORCL-002`), not a value written before the transaction, and needs no Mega System Transaction for it.
+
+**Rex6 defect fixed.** A transaction that read an Oracle slot, sent a hint that had the service fetch another value, and read the slot again, writing nothing to it between, was answered two values for one slot, and no single Mega System Transaction ordered before it could persist both, so a replaying node computed another result than the sequencer.
+Satin leaves such a transaction out of the block (`SATIN-ORCL-013`), and only such a one: a transaction is left out when no value written before it reproduces all its reads of a slot, its own writes included.
+A transaction that reads 7, writes 8 to the slot by a restricted write the Oracle authorizes, and reads 8 is therefore included, the value 7 persisted before it reproducing the first read and its own write the second.
+
+**Why does an unaffordable Oracle read still ask the service and mark the read?**
+Rex6 made the read, and registered it for detention, before charging its cold access, so that a frame which then runs out of gas leaves the registration standing for the rest of the transaction; Satin keeps that order, and loads the slot as every Oracle read does.
 
 **Why does a system call not ask the service?**
-A pre-block call must be a function of the state a stateless validator is given, which carries no service answer for a step before the block's transactions.
-The EIP-2935 and EIP-4788 code reads no Oracle; the rule holds whatever code sits at those addresses.
+A pre-block call must be a function of the state a stateless validator is given, which carries no service answer for a step before the block's transactions, and no Mega System Transaction can be ordered before a pre-block step to persist one.
+Rex6's node asked the service in a system call as in a transaction; Satin does not, a change no canonical pre-block call observes: the EIP-2935 and EIP-4788 code reads no Oracle, and the rule holds whatever code sits at those addresses.
+The block in which Satin activates asks the service for no read either: it admits only deposits, so no Mega System Transaction can persist a value in it before a reader.
 
 **Why count a hint before decoding and keep it counted?**
 Two reasons, each on its own: a payload forwarded to the service cannot be taken back, and admitting and decoding an input is work the node has done whether or not the input decodes.
 A hint is not appended to history, so it pays no history gas; it is data the node handled, so it counts as data size.
 
-**Why is a hint's value condition new?**
-A value call to a `view` method reverts in the bytecode, so a valued hint would reach the service from a call that has no effect on the chain.
-Rex6 forwarded such a hint; Satin drops it.
+**Why does a value-bearing hint still reach the service?**
+Admission is decided before the bytecode runs, on the call's gas, its selector and the caller's access switch, as Rex6 decides it; a value call to the `view` method then reverts in the bytecode, but the hint was already handed over, as for any admitted hint whose call later fails.
+
+**Why is a hint over the data-size limit a stop of its call?**
+Rex6 counted such a hint's bytes and halted the transaction with the data-size failure.
+Satin counts none of them and stops only the call: the payload never left the node, so the data size the block keeps holds none of it, and the call's caller can recover from the stop as from any limit stop ([Limit Stops](../evm/limit-stops.md)), instead of losing the whole transaction to a hint.
 
 ## Security Considerations
 
 - A node that prices an Oracle read by the slot's warmth makes a second read of a slot cheaper than on every other node, and changes the gas used of every transaction that reads it twice.
 - A node that asks the service during a pre-block call computes a pre-block state no stateless validator can reproduce.
+- A sequencer that includes a transaction without persisting before it a served value the transaction's own writes do not explain, or a transaction whose reads of a slot no value written before it reproduces, produces a block every replaying node computes differently.
 - A node that does not count a hint, or counts it only once it decoded, lets a transaction push data to the service past its data-size limit; one that takes the count back when the frame fails lets a transaction send unbounded hints from frames it then reverts.
 - A node that forwards a hint the transaction's data-size limit refuses sends a payload the chain never accounted for.
 - The Oracle's restricted writes run their body before the authorization check, so an unauthorized caller pays for the writes and logs it attempts before the call reverts; a node that checked authorization first would charge such a caller less than the bytecode does and compute another gas used.
@@ -111,4 +138,4 @@ Rex6 forwarded such a hint; Satin drops it.
 - [Rex3](../../upgrades/rex3.md) — Made Oracle detention triggered by an `SLOAD` of the Oracle's storage.
 - [Rex5](../../upgrades/rex5.md) — Oracle version 2.0.0 reads its authority from the SequencerRegistry; hint forwarding gated on a positive gas limit and counted before decoding.
 - [Rex6](../../upgrades/rex6.md) — No hint from a frame whose volatile-data access is off; the Rex6 Oracle is specified in [Oracle](../../system-contracts/oracle.md).
-- [Satin](../../upgrades/satin.md) — The service wins over the slot, every read is cold and loads the slot, system calls ask nothing, a valued call is no hint, and a hint over the data-size limit is a stop.
+- [Satin](../../upgrades/satin.md) — Every read loads the slot, system calls and the block in which Satin activates ask the service nothing, a hint over the data-size limit is a stop of its call, and a transaction whose reads of a slot no value written before it reproduces, its own writes included, is left out; served values are persisted before their readers, as under Rex6, but for a value the reader's own earlier write explains.

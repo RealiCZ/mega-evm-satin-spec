@@ -37,8 +37,8 @@ The node must then agree with every other node on exactly which calls it answers
 The High-Precision Timestamp and the SequencerRegistry have no interceptor.
 KeylessDeploy has none either: its `keylessDeploy` call is recognized by the rule below and deployed natively.
 
-- `SATIN-ICPT-006` A `keylessDeploy(bytes,uint256)` call MUST be recognized by its depth (0, the transaction's own frame), its scheme (`CALL`), its target (`KEYLESS_DEPLOY_ADDRESS`) and its selector alone, whatever code the state holds at the address; what such a call does is specified in [KeylessDeploy](keyless-deploy.md).
-  Every other call to KeylessDeploy runs its bytecode.
+- `SATIN-ICPT-006` A `keylessDeploy(bytes,uint256)` call MUST be recognized by its depth (0, the transaction's own frame), its scheme (`CALL`), its target (`KEYLESS_DEPLOY_ADDRESS`), its selector, and its arguments, which MUST decode under the Solidity ABI as `(bytes, uint256)`, bytes that follow a valid encoding not preventing it, whatever code the state holds at the address; what such a call does is specified in [KeylessDeploy](keyless-deploy.md).
+  A call with the selector whose arguments do not decode is not recognized: the node charges it nothing, and it runs KeylessDeploy's bytecode, as every other call to KeylessDeploy does.
 
 ### The call-depth gate
 
@@ -50,7 +50,7 @@ KeylessDeploy has none either: its `keylessDeploy` call is recognized by the rul
 
 - `SATIN-ICPT-003` An intercepted method of MegaAccessControl or MegaLimitControl called with a non-zero value MUST be answered with a revert whose data is `NonZeroTransfer()`, before any value moves; the method's own answer is not made.
   The policy applies once the selector matched: a call carrying value to a selector the contract does not intercept runs the bytecode.
-  A `sendHint` carrying value is not a hint and runs the Oracle's bytecode (see [Oracle](oracle.md)).
+  A `sendHint` carrying value is admitted as any hint is, and then runs the Oracle's bytecode (see [Oracle](oracle.md)).
 
 ### The answer
 
@@ -75,6 +75,10 @@ The answer then returns exactly as a frame's result would, so the caller settles
 **Why not intercept `DELEGATECALL` or `CALLCODE`?**
 Both run the target's code in the caller's context: the caller's address, value and storage.
 An interceptor answering them would act for the wrong account, so they run the bytecode, whose fallback answers `NotIntercepted()` or whose method is a no-op.
+
+**Why decode a keyless call's arguments before recognizing it?**
+Rex6 decoded the outer call before its interceptor took it, so a call whose arguments did not decode reached KeylessDeploy's bytecode, which reverts, and was charged no dispatch overhead.
+Satin keeps that boundary: only a call the deployment can read is a deployment, and only it pays step 1's overhead ([KeylessDeploy](keyless-deploy.md)).
 
 **Why gate on depth first?**
 The depth failure of an ordinary call is decided when its frame is built, after interception; without the gate an interceptor could answer at a depth no other call can reach.

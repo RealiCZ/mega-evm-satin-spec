@@ -21,7 +21,7 @@ Read one page at a time, the combination is easy to get wrong — a give-back cr
 ## Specification
 
 The rules of this page apply to every transaction and every system call.
-A deposit, a system-originated transaction and a system call pay no history gas, so every history charge and give-back below is zero for them (`SATIN-HIST-016`); a system-originated transaction and a system call are priced at `m = 1` and held to no limit, their counts still being made (`SATIN-STATE-009`, `SATIN-LIM-001`).
+A system call pays no history gas, so every history charge and give-back below is zero for it (`SATIN-HIST-016`); a deposit and a system-originated transaction pay history gas and are given it back as any transaction is; a system-originated transaction and a system call are priced at `m = 1` and held to no limit, their counts still being made (`SATIN-STATE-009`, `SATIN-LIM-001`).
 Each row of a table is a pattern of writes; the rules each row follows from are named in its first cell, and the row restates them for that pattern.
 A table is one rule, and a row is cited as `SATIN-TAKE-<NNN>/<row>`, the row named by its first cell's label.
 
@@ -176,14 +176,14 @@ Regular gas is stated for a warm access; a cold one adds the cold surcharge the 
 
 ### Deposits
 
-- `SATIN-TAKE-012` A deposit MUST be accounted as this table states; a deposit pays no history gas, so every history give-back of the tables above is zero for it (`SATIN-HIST-016`), and it reports zero history bytes (`SATIN-HIST-022`):
+- `SATIN-TAKE-012` A deposit MUST be accounted as this table states; a deposit pays history gas as any transaction does, so the history cells of the tables above hold for it (`SATIN-HIST-016`), and it reports the history bytes it keeps (`SATIN-HIST-022`):
 
 | Pattern | Regular gas and EIP-3529 refund | State gas | History gas | State growth | KV updates | Data size | Frame credited | Order |
 | ------- | ------------------------------- | --------- | ----------- | ------------ | ---------- | --------- | -------------- | ----- |
 | failed-deposit: a deposit that fails validation, cannot pay a charge made before its first frame, or whose own frame halts (`SATIN-DEP-004`, `SATIN-DEP-005`, `SATIN-DEP-006`, `SATIN-ACCT-020`) | The whole gas limit, reported as regular gas; no refund | None, a created caller's included | None | +1 for a caller empty under EIP-161, uncharged; everything else taken back | Every record taken back: zero | The body and the admitted hints stay; everything else taken back | No give-back: nothing returns to the sender, the reservoir and the withheld gas included | At the deposit's end, in place of the settlement |
-| deposit-reverted: a deposit whose own frame reverts or is stopped (`SATIN-STOP-010`, `SATIN-STOP-011`, `SATIN-DEP-003`) | As any revert of the own frame | The created caller's `ACCOUNT_STATE_GAS × m` is kept; the frame's charges come back by its rollback | None | The created caller's +1 is kept; the frame's net is discarded | The frame's net is discarded | The body and hints stay; the frame's net is discarded | The sender, at the settlement | As own-frame |
+| deposit-reverted: a deposit whose own frame reverts or is stopped (`SATIN-STOP-010`, `SATIN-STOP-011`, `SATIN-DEP-003`) | As any revert of the own frame | The created caller's `ACCOUNT_STATE_GAS × m` is kept; the frame's charges come back by its rollback | The body's is kept; the frame's charges come back by its rollback, as own-frame | The created caller's +1 is kept; the frame's net is discarded | The frame's net is discarded | The body and hints stay; the frame's net is discarded | The sender, at the settlement | As own-frame |
 
-  Example (failed-deposit): a deposit with a gas limit of 1,000,000 from a sender empty under EIP-161, whose first frame halts after its caller's 183,600 of state gas was paid, reports 1,000,000 of regular gas, no state and no history gas, one unit of state growth, zero KV updates, the data size of its body and calldata, and zero history bytes; its sender keeps the nonce bump and the mint.
+  Example (failed-deposit): a deposit with a gas limit of 1,000,000 from a sender empty under EIP-161, whose first frame halts after its caller's 183,600 of state gas was paid, reports 1,000,000 of regular gas, no state and no history gas, one unit of state growth, zero KV updates, the data size of its body and calldata, and the same bytes as its history bytes, the body and calldata it keeps; its sender keeps the nonce bump and the mint.
 
 ### Retired ids
 

@@ -154,6 +154,7 @@ Satin therefore keeps no compute-gas ledger: the regular budget is the compute b
 **Why a reservoir share instead of passing the whole reservoir?**
 EIP-8037 passes the whole reservoir to a child so that a hard-coded gas argument cannot starve a callee of state gas.
 Satin keeps the gas argument off the reservoir for the same reason, but keeps 2/100 of it on the caller, as gas forwarding keeps 2/100 of regular gas: a callee that spends its whole share still leaves its caller something to carry on with, which matters because a caller can catch a limit stop below it ([Limit Stops](limit-stops.md)).
+Rex6 had no reservoir, so the share is new for every frame, the children of a system call and of the protocol's own transactions included (`SATIN-FWD-007`): they keep the same 2/100 back as any caller.
 
 **Why does no give-back reach regular gas?**
 Contracts written for Rex, and for Ethereum before Amsterdam, read the gas left after a failed call to tell a starved call from a logic error, and record a failure for good only when they hold more gas than a starved call could have left them; the check assumes that gas a frame spent does not come back while the transaction runs, and Rex6 never gave storage gas back at all.

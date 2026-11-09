@@ -30,6 +30,7 @@ Rex6 bounded it by lowering the transaction's limit on a separate compute-gas le
   - the Oracle's storage, through `SLOAD` in the Oracle's own frame ([Oracle](../system-contracts/oracle.md)).
 - `SATIN-DET-002` `BLOBHASH` MUST NOT be a volatile read: it reads the transaction's own blob hashes.
 - `SATIN-DET-003` A read MUST be marked where its opcode loads the value, and only once the opcode completed; a load that fails, and a read whose opcode then fails, MUST mark nothing.
+  An Oracle read is the exception: it MUST be marked when it is made, before its cold access is charged, and the mark MUST stand for the rest of the transaction though the `SLOAD` then runs out of gas or is stopped ([Oracle](../system-contracts/oracle.md), `SATIN-ORCL-004`), its `compute_at_read` the compute before that charge.
   A call opcode's read of the beneficiary's account — as the call's target or as the EIP-7702 delegate it follows — completes when the start is decided: it MUST be marked after the opcode's charges and its forward, before the child runs its first instruction, and not when the call returns.
   Its `compute_at_read` (`SATIN-DET-012`) MUST NOT include the regular gas the call forwards: the caller's compute at that point is its regular gas spent less that forward, as `SATIN-DET-009` counts a suspended caller.
   A transaction's read of `SATIN-DET-008` is marked before its first frame, at compute zero: the charges made before the first frame are not compute (`SATIN-DET-009`), so the limit it sets is the cap.
@@ -133,7 +134,12 @@ Rex6 halted with `VolatileDataAccessOutOfGas`, which consumed the transaction's 
 As a limit stop, kind 2, the crossing reverts only the frame that made the charge, its caller can catch it, and the withheld gas returns to the sender.
 
 **Why is `BLOBHASH` no longer volatile?**
-It reads the transaction's own blob hashes, which no other transaction shares, so it causes no conflict; Rex6 treated it as volatile.
+It reads the transaction's own blob hashes, which no other transaction shares, so it causes no conflict and nothing a detention would bound.
+Rex6 treated it as volatile because its volatile set carried the opcode over with the block environment; Satin, on the ruling that a value no other transaction shares is no volatile data, neither detains it nor refuses it in a frame whose volatile-data access is off.
+
+**Why does a read whose opcode fails mark nothing, but an Oracle read stand?**
+Rex6 registered a read of the beneficiary's account by `BALANCE`, `EXTCODESIZE`, `EXTCODEHASH`, `EXTCODECOPY` or `SELFDESTRUCT` before charging its access, so a frame that then ran out of gas left the registration standing; Satin marks such a read only once its opcode completed, because the read did not happen: the opcode halts before it loads the account, and the replay skips the same load ([The Stateless Witness](../block/stateless-witness.md)).
+The Oracle read keeps Rex6's order: it is made — the service asked and the slot loaded — before its charge, so the read did happen, and its mark stands with it.
 
 **Why are creations not reads?**
 A creation loads its creator to check balance and nonce and its created address to decide the created account's state gas, as a value call checks its caller's balance; neither is a read of the beneficiary's state that another transaction conflicts on, and Rex6 neither marked nor refused a creation.

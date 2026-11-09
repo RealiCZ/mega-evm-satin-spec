@@ -114,6 +114,8 @@ Counting that change, and taking it back when a write is undone, makes the KV co
 **Why are the sender and the fee accounts fixed records of the body?**
 Rex6 counted the caller as an update that could not be discarded and each fee recipient after the result, where the count could not stop anything.
 The body bounds those five writes before execution, and a write execution itself makes to a fee account is counted where it happens, so every count can still stop the frame that made it.
+Rex6 also counted a fee recipient its fee credit created as one unit of state growth; Satin counts none (`SATIN-ACCT-017`): the fee credit is the settlement's, made once every count that could stop a frame has been made, and a body record bounds it already.
+The counts change with it: an empty-calldata, zero-value deposit to an account without code reported 150 bytes of data size and one KV update under Rex6, and reports 310 bytes and none under Satin; a transaction whose fee credit creates a fee recipient reports no growth for it; so a block fills at another point than under Rex6.
 
 **Why keep the KV check when data size binds first?**
 At 40 bytes per record, 500,000 records weigh more than the 13,107,200-byte data-size limit, so today the data-size check stops first.

@@ -26,8 +26,15 @@ The timestamp is served through the Oracle's storage; nodes and contracts must a
     `update(uint256 ts)` forwards to the Oracle's `setSlot`, which authorizes its immediate caller — the timestamp contract itself — and so commits only when the live system address is `HIGH_PRECISION_TIMESTAMP_ADDRESS`, and otherwise reverts.
     `ORACLE_CONTRACT_ADDRESS()` returns `ORACLE_CONTRACT_ADDRESS`, `ALLOCATION_START()` returns `TIMESTAMP_BASE_SLOT`, and `ALLOCATION_SIZE()` returns `TIMESTAMP_MAX_SLOTS` as a `uint32`.
   - **Storage allocation.** Of the Oracle's storage, slot `TIMESTAMP_BASE_SLOT` holds the current timestamp in microseconds, and the following slots up to `TIMESTAMP_BASE_SLOT + TIMESTAMP_MAX_SLOTS − 1` are reserved.
-  - **Service.** For a transaction that reads the timestamp, the value the timestamp service gives is a per-transaction snapshot: it MUST be expressed in microseconds, MUST be at most `block.timestamp × MICROSECONDS_PER_SECOND`, MUST be the same for every read the transaction makes, and MUST NOT decrease from one transaction of a block to the next.
-    The protocol MUST NOT require a timestamp write for a transaction that does not read the timestamp.
+  - **Service.** For a transaction that reads the timestamp, the value the timestamp service gives is a per-transaction snapshot, and it MUST be:
+    - expressed in microseconds;
+    - at most `block.timestamp × MICROSECONDS_PER_SECOND`;
+    - above `parent.timestamp × MICROSECONDS_PER_SECOND`, the parent block's timestamp in microseconds, when the block's timestamp is above its parent's, and `block.timestamp × MICROSECONDS_PER_SECOND` when the two timestamps are equal;
+    - the same for every read the transaction makes;
+    - at least the snapshot any earlier transaction was given, of the same block or of an earlier one.
+
+    The snapshot MUST be persisted before the transaction that read it unless that transaction's own write explains it (see [Oracle](oracle.md), `SATIN-ORCL-012`), and the protocol MUST NOT require a timestamp write for a transaction that does not read the timestamp.
+    In the block in which Satin activates the service is not asked (`SATIN-ORCL-005`), and a read pushes the slot's value.
 - `SATIN-HPTS-002` The wrapper's reads of the Oracle's storage are Oracle reads: an `SLOAD` in the Oracle's own frame, reached through `getSlot`, MUST be answered by the oracle service, charged as a cold access and held to gas detention as [Oracle](oracle.md) and [Gas Detention](../evm/gas-detention.md) specify, and a frame whose volatile-data access is off MUST be refused it (see [MegaAccessControl](mega-access-control.md)).
 
 ## Constants
@@ -52,14 +59,18 @@ They resolve sub-second blocks and fit one storage word.
 **Why a per-transaction snapshot?**
 A transaction that reads the timestamp twice must see one time, and successive transactions must see time move forward, or an ordering a contract derives from the timestamp contradicts the block's.
 
+**Why above the parent's timestamp, and never below an earlier snapshot?**
+A transaction must not read a time before the block it follows, and time must not run backwards from one block to the next.
+The Rex6 page stated only the upper bound and the order within a block; the timestamp service of the node Rex6 runs on also keeps each snapshot above the parent block's time and never below the last snapshot it gave, and Satin states both as the service's obligations.
+
 ## Security Considerations
 
 - A node that answered the wrapper's read from the slot alone, ignoring the service, would read an older time than every other node.
-- A timestamp service that returned decreasing values within a block would let a later transaction appear to precede an earlier one to any contract that orders by it.
+- A timestamp service that returned decreasing values within a block or across blocks, or a value at or before the parent block's time, would let a later transaction appear to precede an earlier one to any contract that orders by it.
 - The wrapper's reads are volatile; a node that did not detain them would let a transaction that read the time keep computing past the limit every other node applies.
 
 ## Spec History
 
 - [MiniRex](../../upgrades/minirex.md) — Introduced the High-Precision Timestamp.
 - [Rex6](../../upgrades/rex6.md) — The Rex6 contract is specified in [High-Precision Timestamp](../../system-contracts/high-precision-timestamp.md).
-- [Satin](../../upgrades/satin.md) — The contract is unchanged; its reads follow the Satin Oracle read and detention rules.
+- [Satin](../../upgrades/satin.md) — The contract is unchanged; its reads follow the Satin Oracle read and detention rules, and the service's lower bound and its order across blocks are stated.

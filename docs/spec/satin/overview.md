@@ -64,7 +64,7 @@ A page that gathers rules whose detail lives elsewhere — [Halts, Reverts and S
 
 ### System contracts
 
-- [System Contracts](system-contracts/overview.md) — the six system contracts, their addresses and code.
+- [System Contracts](system-contracts/overview.md) — the six system contracts, their addresses and code, and their deployment in every block.
 - [Call Interception](system-contracts/interception.md) — how the node answers a call to an intercepted method.
 - [Oracle](system-contracts/oracle.md) — Oracle reads answered by the oracle service, and hints.
 - [High-Precision Timestamp](system-contracts/high-precision-timestamp.md) — the timestamp wrapper over the Oracle's storage.

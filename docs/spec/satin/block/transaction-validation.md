@@ -54,11 +54,11 @@ Beyond the base layer's checks, a transaction can carry a body too large for the
 
 - `SATIN-VAL-008` A deposit MUST NOT be rejected for failing a validation check: a deposit that fails any check of this page, or of the base layer, MUST be included as a failed deposit instead (see [Deposit Transactions](deposits.md)).
   A Mega System Transaction is a legacy transaction until it has passed its own chain-id, nonce and EIP-3607 checks, so failing one of those is a rejection; once it has passed them it runs as a deposit, and a check it fails after that includes it as a failed deposit.
-  A read the node fails to make — a database read, a bucket-capacity read, the registry read — is not a validation check, for a deposit as for any transaction: the transaction gets no outcome, as [Halts, Reverts and Stops](../evm/outcomes.md) specifies, and the node reports it as `SATIN-VAL-010` classifies it.
+  A read the node fails to make — a database read, a bucket-capacity read — is not a validation check, for a deposit as for any transaction: the transaction gets no outcome, as [Halts, Reverts and Stops](../evm/outcomes.md) specifies, and the node reports it as `SATIN-VAL-010` classifies it.
 - `SATIN-VAL-010` A read a node fails to make for a transaction MUST be reported by its cause, and the transaction MUST NOT be settled, as a failed deposit or otherwise:
   - a failed bucket-capacity read, always as an internal error of the node (`SATIN-STATE-007`);
-  - a failed database read the transaction's execution makes — in its validation, the registry read of `SATIN-REG-002` among them, in a frame, in the authorization list's simulation or application, or in a charge made before the first frame — as an internal error when the node's database declares the error fatal, and otherwise as an invalid block, as for a pre-block call (`SATIN-PBLK-006`);
-  - a failed read the block's execution makes for the transaction outside its execution — the live system address the block reads to decide whether the transaction is a Mega System Transaction (`SATIN-BLK-006`), the sender's account before the transaction runs, the L1 block contract's account and the footprint gas scalar before a non-deposit transaction — always as an internal error, as the activation check's is.
+  - a failed database read the transaction's execution makes — in its validation, a Mega System Transaction's sender checks and the L1 block contract's account and slots its fee computation reads (`SATIN-WIT-011`) among them, in a frame, in the authorization list's simulation or application, or in a charge made before the first frame — as an internal error when the node's database declares the error fatal, and otherwise as an invalid block, as for a pre-block call (`SATIN-PBLK-006`);
+  - a failed read the block's execution makes for the transaction outside its execution — the sender's account before the transaction runs, the L1 block contract's account and the footprint gas scalar the block reads before a non-deposit transaction — always as an internal error, as one in the factory check or in the resolution of the live system address is (`SATIN-REG-007`).
 
   A node that meets such a failure reaches no verdict on the block except the invalid block of the second case, and cannot execute the block past that transaction.
 
@@ -91,6 +91,11 @@ The order names the error a pool reports for a transaction Satin refuses; the ba
 **Why is the chain-id check on?**
 Rex6 ran with the check off, so a transaction signed for another chain, or a typed transaction without a chain id, was valid on MegaETH.
 A pre-EIP-155 legacy transaction stays valid, as it is on Ethereum, so that Nick's-method deployments and other pre-signed transactions remain possible; a Mega System Transaction, which needs replay protection, must carry one.
+
+**Why classify a failed read by its cause, a Mega System Transaction's included?**
+Rex6 classified a failed database read in a transaction by the database's own verdict, fatal or not, as Satin does, with one exception: in a Mega System Transaction's sender checks every failed read was reported as an internal error, fatal or not.
+Satin classifies those reads by their cause too, so the same database error is reported the same way whichever transaction meets it.
+The L1 block slots a fee computation reads are read in the transaction's validation, as Rex6's base layer reads them on demand, and take that same routing; the footprint gas scalar, which the block reads before a non-deposit transaction and Rex6's base layer did not have, is a read of the block, and its failure is always an internal error.
 
 **Why is pool behaviour not specified?**
 What a pool can check without state follows from these rules; how a pool reports or orders transactions does not decide any block, and is node documentation.

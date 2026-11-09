@@ -1,5 +1,5 @@
 ---
-description: Satin (unstable) — System Contracts. The six MegaETH system contracts under Satin, their addresses and the code each must hold, and how a system contract differs from a precompile.
+description: Satin (unstable) — System Contracts. The six MegaETH system contracts under Satin, their addresses and the code each must hold, their deployment in every block, and how a system contract differs from a precompile.
 spec: Satin
 maturity: unstable
 ---
@@ -10,13 +10,13 @@ maturity: unstable
 **Unstable** — Satin is under active development: everything on this page may change before Satin is frozen.
 {% endhint %}
 
-Abstract: The registry of MegaETH's six system contracts: their fixed addresses, the code each address holds, the rule that Satin deploys, upgrades and seeds none of them, and the distinction between a system contract, whose methods run as bytecode unless the node intercepts them, and a precompile.
+Abstract: The registry of MegaETH's six system contracts: their fixed addresses, the code each address holds, how every block deploys them before its transactions, and the distinction between a system contract, whose methods run as bytecode unless the node intercepts them, and a precompile.
 
 ## Motivation
 
 MegaETH exposes protocol functions — oracle-fed storage, a sub-second timestamp, keyless deployment, volatile-data access control, a query of the remaining compute, and the registry of the system address and the sequencer — through contracts at fixed addresses.
 Contracts deployed on the chain call them by address and ABI, and the node answers some of their methods itself.
-If two nodes disagreed on which addresses are system contracts, on the code those addresses hold, or on which calls the node answers rather than the bytecode, a call to one of them would execute differently on each.
+If two nodes disagreed on which addresses are system contracts, on the code those addresses hold, on when a missing or altered contract is installed again, or on which calls the node answers rather than the bytecode, a call to one of them would execute differently on each.
 
 ## Specification
 
@@ -48,8 +48,14 @@ If two nodes disagreed on which addresses are system contracts, on the code thos
 | MegaLimitControl         | 1.0.0   | `MEGA_LIMIT_CONTROL_CODE_HASH`                                       |
 | SequencerRegistry        | 2.0.0   | `SEQUENCER_REGISTRY_CODE_HASH`                                       |
 
-- `SATIN-SYSC-003` A node MUST NOT deploy, upgrade or seed any system contract: no block installs code at a system-contract address or writes a system contract's storage other than through the execution of its transactions and its pre-block calls.
-  The chain holds them when Satin activates, and the block in which Satin activates checks that each address holds the code above (see [Activation and Rex-Era Carry-Over](../block/activation.md)).
+### Deployment
+
+- `SATIN-SYSC-003` Every block MUST deploy the system contracts before its first transaction, as steps of its pre-block sequence (see [System Calls and the Pre-Block Sequence](../block/system-calls.md)), on the state the earlier steps left:
+  - the Oracle, the High-Precision Timestamp, KeylessDeploy, MegaAccessControl and MegaLimitControl, in that order, each by the same rule: an address with no account MUST be given an account holding the contract's code; an account whose code hash is not the one the table above names MUST have its code replaced by the contract's, its nonce, balance and storage kept; an account whose code hash is the table's MUST be left as it is;
+  - then the SequencerRegistry, which holds roles and histories and so is deployed by its own rule: seeded when it is new, migrated in place from its earlier version, and never overwritten when it holds other code (see [SequencerRegistry](sequencer-registry.md), `SATIN-REG-008`).
+
+  A deployment is charged nothing, counts toward none of the block's counters, and writes nothing but the account and the code it installs (and, for the registry, the slots `SATIN-REG-008` names); an account it leaves as it is MUST still be read, and recorded as a read-only entry of the step's state (see [The Stateless Witness](../block/stateless-witness.md)).
+  No block installs code at a system-contract address, or writes a system contract's storage, other than by these steps, by the execution of its transactions and by its pre-block calls.
 
 ### Distinction from precompiles
 
@@ -80,21 +86,21 @@ The deployed bytecode of each version is published as the `deployedBytecode` fie
 
 **Why a code hash rather than a version name?**
 A version name is a label; the code hash fixes the bytes every node executes.
-Checking the hash once, at activation, is enough for a node to know that every later call to the contract runs the same methods everywhere.
+Every block's deployment compares it, so a node knows before each block's transactions that every call to the contract runs the same methods everywhere.
 
 **Why does Satin keep the Rex-era bytecode?**
 Contracts deployed under Rex6 call these contracts by address and ABI, and the chain's storage in them — Oracle values, the registry's roles and histories — was written by that bytecode.
 Satin changes how the node executes around them (Oracle reads, interception, keyless deployment), not the contracts; keeping the bytecode keeps every caller and every slot valid, and needs no upgrade at activation.
 
-**Why does Satin deploy nothing?**
-A chain reaches Satin through the Rex-era forks, which installed the six contracts at the versions Satin runs (Rex5 deployed the SequencerRegistry and upgraded the Oracle to 2.0.0; Rex6 upgraded the SequencerRegistry to 2.0.0).
-Deploying them again would rewrite state the chain already holds; checking them instead fails closed on a chain that does not hold them.
+**Why deploy in every block?**
+Rex6 makes every block install a system contract that is missing and rewrite one whose code differs, and Satin keeps that rule: a chain always runs the contracts the spec names, a chain on which Satin is active from genesis receives them in its first block, and a contract whose code another path changed is installed again.
+On a chain that came through the Rex era the contracts are already right, so the step reads them and writes nothing; it rewrites only code, never the storage contracts and callers depend on, and the registry, whose storage holds roles and histories, is seeded only when it is new.
 
 ## Security Considerations
 
 - A node that treats another address as a system contract, or runs a system contract as a precompile, gives calls to it another result than every other node, and builds a different state.
-- A chain whose system-contract address held other code would let that code answer as the Oracle or the registry; the activation check of [Activation and Rex-Era Carry-Over](../block/activation.md) is what refuses such a chain, so a node that skips it runs Satin on contracts nobody verified.
-- A node that deploys or re-seeds a contract at activation overwrites the registry's roles or the Oracle's storage, changing the live system address and the values contracts read.
+- A node that skipped the deployment would run a block on a missing system contract, or on other code at its address, which every other node replaced; a call to it would answer differently.
+- A node that cleared a contract's storage when it replaced its code, or seeded or overwrote an existing registry, would lose the Oracle's values or the registry's roles and histories, changing the live system address and the values contracts read.
 
 ## Spec History
 
@@ -103,4 +109,4 @@ Deploying them again would rewrite state the chain already holds; checking them 
 - [Rex4](../../upgrades/rex4.md) — Introduced MegaAccessControl and MegaLimitControl.
 - [Rex5](../../upgrades/rex5.md) — Introduced the SequencerRegistry and upgraded the Oracle to 2.0.0.
 - [Rex6](../../upgrades/rex6.md) — Upgraded the SequencerRegistry to 2.0.0; the Rex6 registry is specified in [System Contracts](../../system-contracts/overview.md).
-- [Satin](../../upgrades/satin.md) — Keeps the six contracts' bytecode, deploys none of them, and checks them at activation.
+- [Satin](../../upgrades/satin.md) — Keeps the six contracts' bytecode and Rex6's deployment of them in every block.

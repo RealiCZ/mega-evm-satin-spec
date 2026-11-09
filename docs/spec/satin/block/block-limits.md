@@ -1,5 +1,5 @@
 ---
-description: Satin (unstable) — Block Limits and Packing. What a block counts of its transactions, the three packing budgets and the transactions they never refuse, the block gas limit, and what a builder may do as policy that a validator never applies.
+description: Satin (unstable) — Block Limits and Packing. What a block counts of its transactions, the three packing budgets and the deposits they never refuse, the block gas limit, and what a builder may do as policy that a validator never applies.
 spec: Satin
 maturity: unstable
 ---
@@ -10,29 +10,28 @@ maturity: unstable
 **Unstable** — Satin is under active development: everything on this page may change before Satin is frozen.
 {% endhint %}
 
-Abstract: What a block counts of each transaction; the three counts — data size, KV updates and state growth — that are packing budgets, checked before each transaction runs; the deposits and Mega System Transactions those budgets never refuse; the block gas limit; when a transaction is skipped for a block; how a builder that executes candidates before committing them commits one; and the building policy a builder may apply and a validator never does.
+Abstract: What a block counts of each transaction; the three counts — data size, KV updates and state growth — that are packing budgets, checked before each transaction runs; the deposits those budgets never refuse, and the Mega System Transactions they hold as any other transaction; the block gas limit; when a transaction is skipped for a block; how a builder that executes candidates before committing them commits one; and the building policy a builder may apply and a validator never does.
 
 ## Motivation
 
 A single block must not carry more data, more storage writes or more new state than nodes can absorb at MegaETH's block rate, whatever the gas its transactions pay; state gas prices new state, but at `m = 1` a thousand new slots cost 97,920,000 gas, which a large block gas limit easily covers.
-The block must also always be able to hold the transactions it cannot refuse: deposits, which L1 derivation requires, and the sequencer's own oracle updates, without which the block's transactions read values the chain cannot reproduce.
+The block must also always be able to hold the transactions it cannot refuse: deposits, which L1 derivation requires; the sequencer's own oracle updates are transactions like any other, and a reader of a value they would persist cannot be included without them.
 And a builder that executes transactions ahead of committing them must not commit an outcome computed on a state that another commit since changed.
 
 ## Specification
 
 ### What a block counts
 
-- `SATIN-BLK-001` A block MUST count, for each transaction it includes, the transaction's regular gas as `max(regular, floor)`, its state gas, its history gas, its history bytes (`SATIN-HIST-022`: zero for a transaction exempt from history gas), its data size, its KV updates and its state growth, as the transaction reports them (see [Two-Pool Gas](../evm/gas-model.md), [History Gas](../evm/history-gas.md) and [Resource Accounting](../evm/resource-accounting.md)).
+- `SATIN-BLK-001` A block MUST count, for each transaction it includes, the transaction's regular gas as `max(regular, floor)`, its state gas, its history gas, its history bytes (`SATIN-HIST-022`), its data size, its KV updates and its state growth, as the transaction reports them (see [Two-Pool Gas](../evm/gas-model.md), [History Gas](../evm/history-gas.md) and [Resource Accounting](../evm/resource-accounting.md)).
 
 ### The packing budgets
 
 - `SATIN-BLK-002` Three of those counts are limited, each checked before the next transaction runs: data size against `BLOCK_DATA_LIMIT`, KV updates (write records) against `BLOCK_KV_UPDATE_LIMIT`, and state growth (new accounts and new slots) against `BLOCK_STATE_GROWTH_LIMIT`.
 - `SATIN-BLK-003` A block reaches a limit when its counter is at or above it.
-  The transaction that moves a counter from below its limit to the limit, or past it, MUST be included; once a limit is reached, every later transaction that is neither a deposit nor a Mega System Transaction MUST be skipped before it runs.
+  The transaction that moves a counter from below its limit to the limit, or past it, MUST be included; once a limit is reached, every later transaction that is not a deposit MUST be skipped before it runs, a Mega System Transaction included.
   When more than one limit is reached, a node MAY report the skip in the order data size, KV updates, state growth; two nodes need not name the same one, and a skip leaves no field in the block.
-- `SATIN-BLK-006` A deposit (a transaction whose envelope is a deposit) and a Mega System Transaction MUST NOT be refused by any of the three budgets, nor by any building policy, and MUST count toward each.
-  The block MUST decide this before the transaction runs, from the transaction's envelope and the live system address the block's state names (see [SequencerRegistry](../system-contracts/sequencer-registry.md)): a legacy transaction of the system shape sent from that address is a Mega System Transaction here; a transaction from that address of another shape is treated as any other transaction, and is invalid (see [Mega System Transactions](../system-contracts/system-tx.md)).
-- `SATIN-BLK-007` A Mega System Transaction MUST still be held to the block gas limit and, its envelope being legacy, to the block's data-availability footprint (see [Base Layer](../base-layer.md)), which it counts toward; the exemption is from the three packing budgets and from building policy alone.
+- `SATIN-BLK-006` A deposit (a transaction whose envelope is a deposit) MUST NOT be refused by any of the three budgets, nor by any building policy, and MUST count toward each; the block decides this from the transaction's envelope, before the transaction runs.
+- `SATIN-BLK-007` A Mega System Transaction MUST be held to the three packing budgets, to building policy, to the block gas limit and, its envelope being legacy, to the block's data-availability footprint (see [Base Layer](../base-layer.md)), as any other non-deposit transaction is, and MUST count toward each.
 - `SATIN-BLK-008` Execution gas, state gas and history gas MUST have no block limit beyond the block gas limit, and history bytes MUST be reported and not limited.
 - `SATIN-BLK-010` The three packing budgets are protocol values fixed by the spec, the same on every chain; no chain configuration carries them, and a node validating a block MUST hold the block to these values and to no other.
 - `SATIN-BLK-012` A transaction's and a block's encoded size MUST NOT be limited by these rules; a block-size rule of the base layer, where a chain adopts one, is the node's to apply and is not one of these limits.
@@ -43,7 +42,7 @@ And a builder that executes transactions ahead of committing them must not commi
 - `SATIN-BLK-013` A transaction MUST be skipped for the current block, and MAY be included in a later one, when:
   - its declared gas limit does not fit in the block's remaining gas;
   - its data-availability footprint does not fit in what the block's gas limit has left for footprints (see [Base Layer](../base-layer.md));
-  - it is neither a deposit nor a Mega System Transaction and the block has reached one of its packing budgets;
+  - it is not a deposit and the block has reached one of its packing budgets;
   - it is not a deposit and the block admits only deposits (see [Base Layer](../base-layer.md)).
 
   A block that contains a transaction these rules skip MUST be invalid.
@@ -58,7 +57,7 @@ And a builder that executes transactions ahead of committing them must not commi
 ### Building policy
 
 - `SATIN-BLK-011` A block builder MAY pack tighter than these rules, as building policy: it MAY refuse a transaction for its declared gas limit, its encoded size or its data-availability size, hold the block to an encoded-size or data-availability budget, and hold any of the three packing budgets below the protocol's value, never above it; and it MAY pack fewer transactions than the budgets allow by not selecting them.
-  A building policy MUST NOT refuse a deposit or a Mega System Transaction: none of its per-transaction limits or budgets applies to either, and a policy's cap on a packing budget does not.
+  A building policy MUST NOT refuse a deposit: none of its per-transaction limits or budgets applies to one, and a policy's cap on a packing budget does not; it applies to a Mega System Transaction as to any other non-deposit transaction.
   A deposit counts toward the block's encoded size and not toward its data-availability size; a Mega System Transaction counts toward both.
   A node validating a block MUST NOT apply a building policy, and a block is not invalid for a transaction a building policy would have skipped.
 
@@ -75,10 +74,15 @@ And a builder that executes transactions ahead of committing them must not commi
 **Why are the budgets checked before a transaction runs, not after?**
 A block cannot know what a transaction will count before it runs, and refusing a transaction after it ran would waste the work; including the transaction that reaches a budget and skipping the next keeps the budget a bound that is overshot by at most one transaction's counts, which the per-transaction limits bound in turn.
 
-**Why do deposits and Mega System Transactions count but are never refused?**
-A deposit is derived from L1 and must be included; a Mega System Transaction is the sequencer's own oracle update, which the block's other transactions may depend on.
-Rex6 skipped every later candidate, deposits included, once a counter reached its limit; a budget the block's other transactions used up must not keep either out.
-The exemption covers KV updates and state growth for the same reason it covers data size: refusing one for any budget would make the same transaction valid on one budget and skippable on another.
+**Why do deposits count but are never refused?**
+A deposit is derived from L1 and must be included; a budget the block's other transactions used up must not keep it out.
+The exemption covers KV updates and state growth for the same reason it covers data size: refusing a deposit for any budget would make the block the derivation requires unbuildable on one budget and buildable on another.
+
+**Rex6 defect fixed.** A deposit derived from L1 that followed transactions which had filled the block's data-size, KV-update or state-growth budget, or that exceeded a builder's encoded-size cap, was skipped by Rex6 like any other candidate, although the derivation requires the block to hold it, so no valid block could be built.
+Satin exempts deposits from the budgets and from building policy while still counting them (`SATIN-BLK-006`).
+
+**Why are Mega System Transactions held to the budgets?**
+A Mega System Transaction is a transaction the sequencer chooses to include, as in Rex6, which holds it to every budget: when a budget leaves one out, the sequencer leaves out the transactions that read the values it would persist (see [Oracle](../system-contracts/oracle.md), `SATIN-ORCL-012`), rather than the block exceeding its budget.
 
 **Why does state gas not replace the state-growth budget?**
 At `m = 1`, 1,000 new slots cost 97,920,000 state gas; a block gas limit above that does not stop the 1,001st slot, and the count is what bounds state per block.
@@ -96,12 +100,12 @@ Other stale reads change the candidate's result but not the consistency of the s
 ## Security Considerations
 
 - A node that refuses a deposit for a packing budget cannot build or validate the block the derivation requires.
-- A node that refuses a Mega System Transaction for a budget lets the block's other transactions crowd out the oracle update they read, so their reads cannot be reproduced.
-- A node that does not count deposits and Mega System Transactions toward the budgets lets a block exceed them by their counts.
+- A sequencer that includes a transaction reading a served Oracle value after the Mega System Transaction that would persist it was skipped for a budget produces a block whose reads no replay reproduces.
+- A node that does not count deposits and Mega System Transactions toward the budgets lets a block exceed them by their counts; one that exempts a Mega System Transaction from them accepts a block every other node refuses.
 - A validator that applies a builder's policy rejects valid blocks.
 - A builder that commits a stale candidate writes an inconsistent sender account into the block.
 
 ## Spec History
 
 - [Rex6](../../upgrades/rex6.md) — Block limits on data size, KV updates and state growth that skip every later candidate, deposits included; specified in [Resource Limits](../../evm/resource-limits.md).
-- [Satin](../../upgrades/satin.md) — The three limits as packing budgets that never refuse a deposit or a Mega System Transaction; building policy separated from validation.
+- [Satin](../../upgrades/satin.md) — The three limits as packing budgets that never refuse a deposit; building policy separated from validation.

@@ -93,7 +93,7 @@ A price that reads the bucket again at each charge also lets a give-back return 
 - `SATIN-STATE-007` A bucket capacity below `MIN_BUCKET_SIZE`, or one the node cannot read, is a fault of the node, for a deposit as for any transaction: the transaction MUST NOT be priced at any multiplier and MUST NOT be settled, and the node MUST report an internal error.
   The transaction then has no outcome ([Halts, Reverts and Stops](outcomes.md)).
 - `SATIN-STATE-009` A system-originated transaction and a system call ([Mega System Transactions and the Protocol's Own Transactions](../system-contracts/system-tx.md)) MUST be priced at `m = 1` and MUST NOT read a bucket capacity.
-  A deposit that is not system-originated MUST be priced by its buckets, although it pays no history gas ([History Gas and the History Allowance](history-gas.md)).
+  A deposit that is not system-originated MUST be priced by its buckets; deposits and system-originated transactions pay history gas as any transaction does ([History Gas and the History Allowance](history-gas.md)).
 
 At `m = 1` every state charge is the schedule's own number: a fresh slot or account in a minimum-size bucket pays its state gas.
 

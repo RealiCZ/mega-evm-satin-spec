@@ -92,11 +92,11 @@ A value transfer that triggers a `receive()` hook must also be able to emit an e
 - `SATIN-HIST-016` These MUST NOT pay history gas:
   - an [EIP-7708 transfer log](transfer-logs.md), which is data size only;
   - an Oracle hint's payload, which goes to the oracle service and not into a block ([Oracle](../system-contracts/oracle.md));
-  - any byte of a deposit, of a system-originated transaction, or of a system call ([Mega System Transactions and the Protocol's Own Transactions](../system-contracts/system-tx.md)); for these the deposited-code history gas MUST be zero too.
+  - any byte of a system call, a pre-block call ([Mega System Transactions and the Protocol's Own Transactions](../system-contracts/system-tx.md)); for it the deposited-code history gas MUST be zero too.
 
-  The exemption is from history gas alone: a deposit that is not system-originated MUST still be priced by bucket ([State Gas and SALT Pricing](state-gas.md)), held to every per-transaction limit, and detained ([Gas Detention](gas-detention.md)).
+  A deposit and a system-originated transaction, a Mega System Transaction among them, MUST pay history gas as any transaction does: for their body, their calldata, their logs, their write records and their deposited code.
 - `SATIN-HIST-017` The EIP-7623 floor MUST still be computed and validated for every transaction ([Gas Schedule and Intrinsic Gas](gas-schedule.md)).
-  It can raise the gas used of a transaction exempt from history gas, and it bounds the figure a block counts on its execution ledger, `max(regular, floor)` (`SATIN-POOL-020`).
+  It can raise the gas used of a transaction whose history gas is small, and it bounds the figure a block counts on its execution ledger, `max(regular, floor)` (`SATIN-POOL-020`).
   Where it binds, the gas used is the floor, drawn from the whole gas limit, the reservoir included (`SATIN-POOL-018`); a deposit, which paid nothing, MUST be charged nothing either way, and only its receipt's and the block's figures move.
 
 ### The history allowance
@@ -116,9 +116,9 @@ A value transfer that triggers a `receive()` hook must also be able to emit an e
 ### The history bytes a transaction reports
 
 - `SATIN-HIST-022` The history bytes a transaction reports, which the block counts ([Block Limits and Packing](../block/block-limits.md)), MUST be the bytes of the byte table (`SATIN-HIST-002`) the transaction keeps — its body, its kept write records, its kept logs and its deposited code — whether history gas or a history allowance paid them, net of every take-back.
-  A transaction exempt from history gas by `SATIN-HIST-016` — a deposit, a system-originated transaction, a system call — MUST report zero history bytes, although its data size still counts those bytes ([Resource Accounting](resource-accounting.md)).
+  A system call, exempt from history gas by `SATIN-HIST-016`, MUST report zero history bytes; a deposit and a system-originated transaction report theirs as any transaction does.
   EIP-7708 transfer logs and Oracle hint payloads are not history bytes.
-  A deposit with empty calldata that makes no write reports 310 bytes of data size and zero history bytes; an ordinary transaction whose value call's child emits a `LOG0` the allowance pays reports that log's 32 bytes among its history bytes.
+  A deposit with empty calldata that makes no write reports 310 bytes of data size and 310 history bytes, its body; an ordinary transaction whose value call's child emits a `LOG0` the allowance pays reports that log's 32 bytes among its history bytes.
 
 ### Retired ids
 
@@ -168,8 +168,9 @@ Charging their five records up front, in the body, bounds them before execution 
 Rex6 granted a value call's callee 23,000 gas of storage-gas allowance, drawn by every storage-gas surcharge.
 Under Satin new state is paid from the reservoir, which a callee always receives a share of, so only history is left for an allowance to cover; 160 bytes is one three-topic event with one word of data, what a `receive()` hook reached through the 2,300-gas stipend needs to log a transfer.
 
-**Why are the protocol's own transactions and deposits exempt?**
-A deposit is derived from L1 and has already paid L1 for its bytes, and the protocol's own transactions are the chain's bookkeeping; charging them would only move gas between protocol accounts.
+**Why do deposits and the protocol's own transactions pay history gas, and system calls not?**
+What a transaction appends to the chain's history is stored by every node whoever sent it, so the price that bounds what one transaction appends applies to a deposit and to a Mega System Transaction as to any transaction; Rex6, too, charged them its storage gas for their calldata, logs and code, sparing them only the SALT-scaled part, which Satin's minimum-bucket pricing of the protocol's transactions keeps.
+A pre-block system call appends no transaction to the history and is the protocol's own step before any transaction, so it pays none.
 
 ## Security Considerations
 
@@ -179,7 +180,7 @@ A deposit is derived from L1 and has already paid L1 for its bytes, and the prot
 - If a failed frame kept a give-back it received, a callee could take back a record its caller paid for, collect the gas and revert, leaving the record standing and the gas spent twice.
 - If the allowance entered the frame's gas, a value call could compute on 14,080 gas its caller never forwarded, and repeated calls could amplify computation without paying for it.
 - If the settlement gave the first frame's record back after the destruction table had already given it back, the transaction would be credited the same history twice.
-- This page preserves the invariant that a transaction's history ledger equals `COST_PER_HISTORY_BYTE` times the history bytes it keeps, less those an exemption or the allowance paid.
+- This page preserves the invariant that a transaction's history ledger equals `COST_PER_HISTORY_BYTE` times the history bytes it keeps, less those an exemption or the allowance paid; a failed deposit is the one exception: it reports its whole gas limit as regular gas and no history gas ([Deposit Transactions](../block/deposits.md), `SATIN-DEP-005`), while its history bytes are the body and calldata it keeps.
 
 ## Spec History
 

@@ -25,6 +25,7 @@ The rules of this page apply to every block from Satin's activation on (see [Act
 ### The base
 
 - `SATIN-BASE-001` Every standard EVM, transaction and block rule that the Satin section does not override MUST be Optimism Karst's, including the Optimism changes of Jovian and Karst and the Ethereum changes of Osaka (for example `CLZ` of [EIP-7939](https://eips.ethereum.org/EIPS/eip-7939)).
+  Satin follows the Optimism forks it requires — Karst, Jovian and their predecessors — with their whole transaction and block rule set, the data-availability footprint gas scalar, the blob gas used a block reports and the fee rules among them, and not rule by rule.
   Where a page of the Satin section states a rule, that rule MUST be applied in place of the base layer's.
 
 ### Inherited caps not applied
@@ -48,8 +49,8 @@ The rules of this page apply to every block from Satin's activation on (see [Act
 - `SATIN-BASE-007` A fork MUST be taken to activate in a block when the chain configuration schedules it, it is active at the block's timestamp, and it is not active at the parent block's timestamp.
   A fork the chain configuration does not schedule MUST NOT be taken to activate in any block.
 - `SATIN-BASE-008` A Mega System Transaction is a legacy transaction, so a block that admits only deposits MUST NOT contain one either.
-  The block in which Satin activates therefore carries no Mega System Transaction, and the protocol requires no write of the [Oracle](system-contracts/oracle.md) in it: its only transactions are deposits, and a deposit from the system address is a failed deposit, which runs no call (see [Mega System Transactions](system-contracts/system-tx.md)).
-  A deposit from another sender can still write the Oracle in that block through code running at the live system address, as `SATIN-ORCL-011` states, when the registry already names such a contract or a delegated account as the system address.
+  The block in which Satin activates therefore carries no Mega System Transaction, so no value the oracle service gave could be persisted in it before a reader (see [Oracle](system-contracts/oracle.md), `SATIN-ORCL-012`); in that block the node MUST NOT ask the service, and every Oracle read pushes the slot's value on the chain (`SATIN-ORCL-005`).
+  A deposit can still write the Oracle in that block through code running at the live system address, as the Oracle's bytecode allows (`SATIN-ORCL-011`).
 
 ### The data-availability footprint
 
@@ -63,7 +64,7 @@ The rules of this page apply to every block from Satin's activation on (see [Act
 - `SATIN-BASE-010` Every non-deposit transaction that pays an L1 fee — every non-deposit transaction but a Mega System Transaction, which pays no fee (`SATIN-MST-005`) — MUST be priced against the L1 block information the block's own L1 attributes deposit wrote.
   That information MUST be what the L1 block contract holds on the state left by the transactions before the block's first non-deposit transaction other than a Mega System Transaction, and it MUST hold for every later transaction of the block.
   The data-availability footprint gas scalar is the exception: it MUST be read from the contract again before each non-deposit transaction, a Mega System Transaction included.
-  Which slots of the contract that information is read from, and when the block reads them, is specified in [The Stateless Witness](block/stateless-witness.md) and [System Calls and the Pre-Block Sequence](block/system-calls.md).
+  The contract's slots are read as the base layer's fee computation and footprint read them, when they need them; that every slot either read makes is in the block's witness is specified in [The Stateless Witness](block/stateless-witness.md) (`SATIN-WIT-011`).
 
 ## Constants
 
@@ -81,6 +82,10 @@ The rules of this page apply to every block from Satin's activation on (see [Act
 **Why Karst rather than Isthmus?**
 Karst is the Optimism base that carries the Osaka EVM and the Jovian and Karst block rules the OP Stack runs on.
 Restating MegaETH's rules on it keeps a Satin node an OP Stack node for every rule MegaETH does not change, instead of a fork of an older base.
+
+**Why take the base forks' rule set whole?**
+Rex6 runs on Isthmus; Satin takes Karst, Jovian and their predecessors with every transaction and block rule they bring, the ones that change what a Rex6 block computes included — a Mega System Transaction's data-availability footprint, the blob gas used a block reports, the operator fee — rather than adopting them one by one.
+A node that took some of a base fork's rules and not others would be no OP Stack node, and every such choice would be one more rule MegaETH must specify and maintain against the base.
 
 **Why drop EIP-7825 and EIP-8037's transaction caps?**
 Both exist to bound the work of one Ethereum transaction.

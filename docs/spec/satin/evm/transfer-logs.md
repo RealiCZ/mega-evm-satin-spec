@@ -48,6 +48,10 @@ None.
 The `Transfer` signature is the one ERC-20 indexers already decode, so value movements show up in the same pipelines as token transfers.
 Later revisions of EIP-7708 require EIP-8246, which removes burns and adds a `Burn` log; Satin keeps the two burns EIP-6780 leaves and keeps them silent, so a revision of the EIP that adds logs does not change Satin's receipts.
 
+**Why does a transfer emit a log Rex6 did not?**
+Rex6 logged only the `LOG` instructions contracts executed, so a value movement — a deposit's value, a value call, a creation's endowment, a destruction's balance — left no log; Satin adopts EIP-7708 at its pinned revision, so every movement leaves one.
+The log is emitted from `TRANSFER_LOG_ADDRESS`, the address EIP-7708 names; that address holds no code and is not a system contract ([System Contracts](../system-contracts/overview.md)).
+
 **Why data size and not history gas?**
 A transfer log is the protocol's record of a movement the transaction already paid for in its value transfer's regular gas; charging history gas for it would make every value transfer dearer by the log's 160 bytes.
 It is still bytes the block carries, so it counts toward the data-size limit.

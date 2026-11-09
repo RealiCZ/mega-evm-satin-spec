@@ -109,12 +109,11 @@ A charge that depends on state cannot be made correctly before the state is read
 ### Addresses warm from the start
 
 - `SATIN-SCHED-012` The addresses EIP-2929 and EIP-3651 make warm from the start of a transaction — the precompiles, the block beneficiary, and the addresses the transaction's access list names, those listed without storage keys included — MUST be charged as warm on every access, their first `CALL`-family access and their first access as a `SELFDESTRUCT` beneficiary included.
-- `SATIN-SCHED-013` The `SequencerRegistry`'s account and its `_currentSystemAddress` slot MUST be warm from the start of every transaction, the slot as an access-list storage key is, because validation reads both for every transaction ([SequencerRegistry](../system-contracts/sequencer-registry.md)).
 - `SATIN-SCHED-014` The sender, and the recipient of a call, MUST be warm from the start of the transaction, as EIP-2929 has them.
 
 ### Retired ids
 
-None.
+- `SATIN-SCHED-013` Retired, removed: no transaction finds the SequencerRegistry's account or slot 0 warm from its start; the block resolves the live system address once, outside every transaction ([SequencerRegistry](../system-contracts/sequencer-registry.md), `SATIN-REG-002`).
 
 ## Constants
 
@@ -154,8 +153,8 @@ EIP-2780 therefore charges the state-independent part of an authorization (7,816
 Rex6 charged a cold access on the first `CALL`-family or `SELFDESTRUCT`-beneficiary touch of a precompile, the beneficiary or an access-list address, a MegaETH addition on Ethereum's warm set.
 Satin restates execution on Ethereum's access rules, under which those addresses are warm from the start, and EIP-8038 prices them as such.
 
-**Why are the registry's account and slot warm?**
-Every transaction's validation reads them to find the live system address, so they are in the transaction's state before its first frame, like the beneficiary under EIP-3651; charging a later access to them as cold would charge for a load that already happened, and only for some envelopes.
+**Why is the registry not warm?**
+The live system address is resolved once per block, outside every transaction, as Rex6 resolves it ([SequencerRegistry](../system-contracts/sequencer-registry.md)); no transaction loads the registry before its first frame, so a transaction's first access to it is cold, as any account's is.
 
 ## Security Considerations
 

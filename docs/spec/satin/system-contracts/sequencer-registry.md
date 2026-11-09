@@ -1,5 +1,5 @@
 ---
-description: Satin (unstable) — SequencerRegistry. The registry of the system address and the sequencer: its code, storage and interface, the read every transaction makes of it for the live system address, and its role changes applied by the pre-block step.
+description: Satin (unstable) — SequencerRegistry. The registry of the system address and the sequencer: its code, storage and interface, its deployment, seeding and migration in every block, the block's resolution of the live system address from it, and its role changes applied by the pre-block step.
 spec: Satin
 maturity: unstable
 ---
@@ -10,13 +10,13 @@ maturity: unstable
 **Unstable** — Satin is under active development: everything on this page may change before Satin is frozen.
 {% endhint %}
 
-Abstract: The SequencerRegistry system contract, which holds two roles — the system address that sends Mega System Transactions and the sequencer that signs mini-blocks — with their change schedules and histories: its code, storage layout and interface, the read every transaction makes of it for the live system address, and how a role change takes effect.
+Abstract: The SequencerRegistry system contract, which holds two roles — the system address that sends Mega System Transactions and the sequencer that signs mini-blocks — with their change schedules and histories: its code, storage layout and interface, its deployment, seeding and migration in every block, the block's resolution of the live system address from it, and how a role change takes effect.
 
 ## Motivation
 
 The address that sends the protocol's maintenance transactions, and the key that signs mini-blocks, must each be changeable without redeploying the contracts that depend on them, and a change must not take effect in the middle of a block.
 Every node must also agree, for every transaction, on which address is the system address: a transaction from it is the protocol's own, exempt from fees and limits, and the same transaction from any other address is a user's.
-If nodes read the system address at different points, or from different state, they classify the same transaction differently.
+If nodes read the system address at different points, or from different state, they classify the same transaction differently; and if they seeded or upgraded the registry differently, they would hold different roles from the first block that has one.
 
 ## Specification
 
@@ -45,6 +45,8 @@ If nodes read the system address at different points, or from different state, t
 | 13   | `_minRotationDelay`             | `uint256`        |
 
   A `ChangeRecord` is packed in one slot as `uint96 fromBlock` followed by `address addr`.
+  Slots 0 to 12 are those of version 1.0.0; slot 13 is version 2.0.0's.
+  A later version of the contract MUST only append storage slots after slot 13: it MUST NOT reorder the slots above or insert a slot before slot 14, since the keys of the two history arrays derive from their slots.
 
   **Interface.**
 
@@ -105,20 +107,34 @@ interface ISequencerRegistry {
 
 ### The live system address
 
-- `SATIN-REG-002` Every transaction MUST read the registry when it is validated, whatever its type and whoever sent it: the node loads the registry's account and, from the transaction's own state, slot 0 (`_currentSystemAddress`).
-  When the account's code hash is `SEQUENCER_REGISTRY_CODE_HASH` and the slot holds a non-zero value, the address the slot holds is the live system address for the transaction.
-  The read MUST compare the account's code hash and MUST NOT load or run the registry's code.
-- `SATIN-REG-003` The registry's account and slot 0 MUST be warm for the rest of the transaction, whatever the registry holds, as the block beneficiary is under [EIP-3651](https://eips.ethereum.org/EIPS/eip-3651).
-  The read MUST NOT be charged and MUST write nothing, and it MUST land in the transaction's returned state, and so in the block's witness, whatever the pre-block states also hold of the registry (see [The Stateless Witness](../block/stateless-witness.md)).
-- `SATIN-REG-004` A registry that is absent, holds other code, or whose slot 0 is zero names no live system address, and then no transaction is a Mega System Transaction (see [Mega System Transactions](system-tx.md)).
-- `SATIN-REG-007` A registry read the node fails to make MUST give the transaction no outcome: it is a fault of the node, never a refusal or a result of the transaction (see [Transaction Validation and Refusals](../block/transaction-validation.md)).
+- `SATIN-REG-002` Once per block, after every other pre-block step (see [System Calls and the Pre-Block Sequence](../block/system-calls.md)), the node MUST resolve the block's live system address from the registry: it loads the registry's account and slot 0 (`_currentSystemAddress`) from the state those steps left, compares the account's code hash with `SEQUENCER_REGISTRY_CODE_HASH`, and takes the address the slot holds.
+  The read MUST compare the code hash and MUST NOT load or run the registry's code; it is not charged, writes nothing, and is committed as a read-only state of the pre-block phase, after the other steps (see [The Stateless Witness](../block/stateless-witness.md)).
+  Every transaction of the block MUST be classified against that address; no transaction reads the registry, or finds its account or slot warm, for its classification.
+- `SATIN-REG-004` A registry that is absent, holds other code, or whose slot 0 is zero when the block resolves the live system address MUST make the block invalid.
+- `SATIN-REG-007` A registry read the node fails to make — in the resolution, in the due-change read of the pre-block sequence, or in the registry's deployment — MUST be reported as an internal error of the node, never as an invalid block or as a result of a transaction (see [System Calls and the Pre-Block Sequence](../block/system-calls.md)).
 
 ### Role changes
 
 - `SATIN-REG-005` A role change takes effect only in a later block than the one that scheduled it, and only through that block's pre-block call to `applyPendingChanges()` (see [System Calls and the Pre-Block Sequence](../block/system-calls.md)).
-  So every transaction of a block MUST read the system address the block's pre-block step left, and a call to `applyPendingChanges()` inside a block finds no change due that the pre-block step did not apply.
-- `SATIN-REG-006` The registry's roles MUST be what its storage holds.
-  A node MUST NOT seed, overwrite or derive them from chain configuration: Satin reads no configuration key for the registry.
+  So every transaction of a block is classified against the address the block resolved after its pre-block steps (`SATIN-REG-002`), and a call to `applyPendingChanges()` inside a block finds no change due that the pre-block step did not apply.
+- `SATIN-REG-006` The registry's roles MUST be what its storage holds: a node writes them only when it deploys the registry new (`SATIN-REG-008`), from the bootstrap values of the chain configuration (`SATIN-REG-009`), and MUST NOT otherwise seed, overwrite or derive them.
+
+### Deployment
+
+- `SATIN-REG-008` Every block MUST deploy the registry as a step of its pre-block sequence, after the due-change read and the `applyPendingChanges()` call (see [System Calls and the Pre-Block Sequence](../block/system-calls.md)), by what the state then holds at `SEQUENCER_REGISTRY_ADDRESS`:
+  - an account whose code hash is `SEQUENCER_REGISTRY_CODE_HASH` (version 2.0.0) MUST be left as it is, and recorded as a read-only entry;
+  - an account whose code hash is `SEQUENCER_REGISTRY_V1_CODE_HASH` (version 1.0.0) MUST be migrated in place: its code replaced by version 2.0.0, slot 13 (`_minRotationDelay`) written with the configured minimum rotation delay, and every other slot — the roles, the pending changes, the histories — kept, as its nonce and balance are;
+  - an address with no account, or an account without code, MUST receive version 2.0.0 as a new contract, an existing account's nonce and balance kept and its storage cleared, and its storage seeded with: slots 0 (`_currentSystemAddress`) and 4 (`_initialSystemAddress`) the address `MEGA_SYSTEM_ADDRESS`; slots 1 (`_currentSequencer`) and 5 (`_initialSequencer`) the configured initial sequencer; slot 2 (`_admin`) the configured initial admin; slot 6 (`_initialFromBlock`) the block's number; and slot 13 (`_minRotationDelay`) the configured minimum rotation delay;
+  - an account holding any other code MUST make the block invalid: the registry's storage is never overwritten by code it was not migrated to.
+
+  The step writes nothing else, is charged nothing and counts toward none of the block's counters.
+- `SATIN-REG-009` A chain configuration that schedules Satin MUST carry the registry's bootstrap values, under the keys the Rex era introduced: `rex5InitialSequencer` and `rex5InitialAdmin`, each a non-zero address, and `rex6MinRotationDelay`, a non-zero number of blocks.
+  A node MUST refuse a configuration that lacks one of them or gives one as zero.
+  The values are read only by the deployment of `SATIN-REG-008`, every block; once the registry holds its roles, its storage, not the configuration, decides them.
+
+### Retired ids
+
+- `SATIN-REG-003` Retired, removed: no transaction reads the registry, or finds its account or slot warm, for its classification; the block resolves the live system address once (`SATIN-REG-002`).
 
 ## Constants
 
@@ -126,6 +142,8 @@ interface ISequencerRegistry {
 | ------------------------------ | -------------------------------------------------------------------- | -------------------------------------------- |
 | `SEQUENCER_REGISTRY_ADDRESS`   | `0x6342000000000000000000000000000000000006`                         | SequencerRegistry                            |
 | `SEQUENCER_REGISTRY_CODE_HASH` | `0xabd7e8f1c8f0f9ca0346df585b65d9791a7e9ba5c431cc4eda5d2c2f1f5e9c43` | SequencerRegistry version 2.0.0              |
+| `SEQUENCER_REGISTRY_V1_CODE_HASH` | `0x63cd411a379be1c198613ef1d15c3058e7b0db4a5d07d4bcf07014af90040315` | SequencerRegistry version 1.0.0, migrated in place |
+| `MEGA_SYSTEM_ADDRESS`          | `0xA887dCB9D5f39Ef79272801d05Abdf707CFBbD1d`                         | The initial system address a new registry is seeded with |
 | `SEQUENCER_ROTATION_TYPEHASH`  | `0xaebf84f20bcc14afc14200ed16cfb9314ef205d4d1d8fbcc0a256c39a3e79aa9` | `keccak256("SequencerRotation(address newSequencer,uint256 activationBlock)")` |
 | `ROTATION_DOMAIN_NAME`         | `MegaETH SequencerRegistry`                                          | EIP-712 domain name of the rotation proof    |
 | `ROTATION_DOMAIN_VERSION`      | `1`                                                                  | EIP-712 domain version of the rotation proof |
@@ -135,28 +153,32 @@ interface ISequencerRegistry {
 **Why two roles?**
 The sender of maintenance transactions and the mini-block signing key are different keys with different operations; coupling them would make every sequencer key change revoke the Oracle's authority.
 
-**Why does every transaction read the registry itself?**
-Rex6 resolved the system address once per block, after the pre-block changes, and handed it to execution.
-Reading it in every transaction's own state makes the classification a function of the state the transaction runs on, which a stateless validator holds in the witness; since a change can only take effect in a later block's pre-block step, every transaction of a block reads the same address.
+**Why resolve the system address once per block?**
+A role change takes effect only in a block's pre-block step, so one read after those steps names the system address for every transaction of the block, as Rex6 resolves it.
+The read is a read-only state of the pre-block phase, so a stateless validator holds it in the witness; and since no transaction reads or warms the registry for its classification, no transaction's gas or read set depends on that read.
 
-**Why is the read warm and free?**
-Every transaction makes it, whatever it does; charging it, or leaving the account cold, would make the first access to the registry cost differently depending on whether the protocol had read it, which is not the transaction's doing.
-
-**Why compare the code hash?**
+**Why compare the code hash, and fail the block?**
 A registry with other code could name any address the system address; the hash fixes the contract whose slot 0 means what it says, and comparing it needs no code load.
+A registry that is absent, holds other code or names no system address after the deployment step can only come from a corrupted state or a wrong configuration; as in Rex6 the block is then invalid, rather than executed as a block whose protocol transactions are users'.
 
-**Why does Satin read no configuration for the roles?**
-The Rex5 and Rex6 activations seeded the registry from their own configuration keys; from then on the roles are state, changed only through the registry.
+**Why seed the registry from the configuration?**
+`_initialFromBlock` is the number of the block that deploys the registry, which no bytecode constant can carry, and the initial sequencer, the admin and the rotation delay are each network's own; seeding them at the deployment keeps one code hash for every network, as Rex6 does.
+The initial system address is not configurable: it is `MEGA_SYSTEM_ADDRESS`, the address every node, pool and replay path treats as the system address until the registry names another.
+
+**Why never overwrite other code at the registry's address?**
+Unlike the other system contracts, the registry holds roles and histories in its storage; replacing foreign code without a migration for it would reinterpret that storage under another layout.
+The one migration is version 1.0.0's, whose slots 0 to 12 version 2.0.0 keeps: the code is replaced and only the new slot written, so a pending change scheduled under version 1.0.0 still activates.
 
 ## Security Considerations
 
-- A node that resolved the system address from another state than the transaction's own would treat a retired system address's transactions as the protocol's, or the new one's as a user's.
-- A node that did not check the code hash would let other code at the registry's address name a system address, and so exempt arbitrary transactions from fees and limits.
+- A node that resolved the system address from another state than the one the block's pre-block steps left would treat a retired system address's transactions as the protocol's, or the new one's as a user's.
+- A node that did not check the code hash, or executed a block whose registry names no system address, would let other code at the registry's address name a system address, and so exempt arbitrary transactions from fees and limits, or run a block without the protocol's transactions.
+- A node that seeded the registry over an existing one, or replaced foreign code at its address, would reset or reinterpret its roles and histories.
 - The possession proof keeps a sequencer change from naming a key nobody holds; the rotation delay leaves a window to cancel a bad change. A registry without them could halt block production at the activation block.
-- A node that counted the registry read as cold, or charged it, would compute another gas used for every transaction that touches the registry.
+- A node that warmed the registry for a transaction, or charged a transaction for the resolution, would compute another gas used for every transaction that touches the registry.
 
 ## Spec History
 
 - [Rex5](../../upgrades/rex5.md) — Introduced the SequencerRegistry at version 1.0.0.
 - [Rex6](../../upgrades/rex6.md) — Upgraded it to version 2.0.0 in place (rotation proof and delay); the Rex6 registry is specified in [SequencerRegistry](../../system-contracts/sequencer-registry.md).
-- [Satin](../../upgrades/satin.md) — Every transaction reads the live system address from the registry itself; Satin seeds and upgrades nothing.
+- [Satin](../../upgrades/satin.md) — The registry, its deployment and its resolution once per block are Rex6's; its layout's append-only rule is restated.
