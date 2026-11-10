@@ -50,6 +50,8 @@ A deposit that cannot be executed must still be recorded, and the record must sa
 - `SATIN-DEP-011` A state in which a deposit's sender's balance plus the deposit's mint exceeds `MAX_BALANCE` when the deposit is executed is an invalid prestate: the execution of such a deposit, whether it would succeed or fail, lies outside this specification.
 - `SATIN-DEP-013` A deposit has no gas price: an envelope that presents itself as a deposit and carries a gas price is malformed, and its execution lies outside this specification.
 
+A value transfer a deposit makes — its value, or a `CALL`'s, a `SELFDESTRUCT`'s or a creation's within it — that would push its recipient's balance above `MAX_BALANCE` lies outside this specification as any transaction's does (see [Base Layer](../base-layer.md), `SATIN-BASE-011`).
+
 ## Constants
 
 | Constant      | Value    | Description                                     |
@@ -84,6 +86,7 @@ Only a halt, a validation failure, or a charge before the first frame it cannot 
 **Why is a mint that overflows the balance outside the specification?**
 No chain can reach it: all the ether in existence is about 1.2 × 10^26 wei, far below 2^256.
 The base layer's implementations disagree on it — saturating on success, a checked or a wrapping credit on failure — and defining one would bind every node to a behaviour no block can exercise.
+A value transfer that would overflow its recipient's balance is outside the specification for the same reason, for a deposit as for any transaction (`SATIN-BASE-011`).
 
 **Why does a deposit that fails early load nothing of its recipient?**
 The read set is part of what a stateless validator is given; a deposit refused before its first frame decides nothing on its recipient, so loading it would put an account in the witness that no execution reads.

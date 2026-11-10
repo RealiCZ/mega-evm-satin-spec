@@ -83,6 +83,11 @@ Satin exempts deposits from the budgets and from building policy while still cou
 
 **Why are Mega System Transactions held to the budgets?**
 A Mega System Transaction is a transaction the sequencer chooses to include, as in Rex6, which holds it to every budget: when a budget leaves one out, the sequencer leaves out the transactions that read the values it would persist (see [Oracle](../system-contracts/oracle.md), `SATIN-ORCL-012`), rather than the block exceeding its budget.
+An exemption from the budgets would not save that reader, and an earlier design that exempted Mega System Transactions is superseded for this reason.
+The three budgets stop only a transaction that finds a counter at or above its limit (`SATIN-BLK-003`): a reader the builder executed passed its check at the counters its Mega System Transaction, inserted before it, is then checked at, so that transaction passes the budgets as any other would, and its usage, which would count toward each budget even if it were exempt, as a deposit's does (`SATIN-BLK-006`), is what can then stop the reader.
+The data-availability footprint and a builder's encoded-size budget are fit checks the reader fails the same way with or without an exemption.
+A per-transaction cap is building policy: the builder chooses its policy, and so whether it adopts a cap that would refuse its own Mega System Transaction (`SATIN-BLK-011`).
+What remains — a reader executed, then refused at its Mega System Transaction's re-check (`SATIN-BLK-004`), and the sequencer's writes crowded out of a full block — belongs to block building and is the node's to address: it can check the fit of the Mega System Transaction together with its reader before committing either, defer both to the next block, and bound the attempts per transaction and per sender.
 
 **Why does state gas not replace the state-growth budget?**
 At `m = 1`, 1,000 new slots cost 97,920,000 state gas; a block gas limit above that does not stop the 1,001st slot, and the count is what bounds state per block.

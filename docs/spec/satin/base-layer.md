@@ -10,7 +10,7 @@ maturity: unstable
 **Unstable** — Satin is under active development: everything on this page may change before Satin is frozen.
 {% endhint %}
 
-Abstract: The base Satin builds on, Optimism Karst with its Ethereum base Osaka; the opcodes Satin enables that Osaka does not have; the inherited per-transaction gas caps Satin does not apply; and the Karst block rules — deposit-only activation blocks, the data-availability footprint, and pricing against the block's L1 information — as they apply to MegaETH blocks.
+Abstract: The base Satin builds on, Optimism Karst with its Ethereum base Osaka; the opcodes Satin enables that Osaka does not have; the inherited per-transaction gas caps Satin does not apply; the Karst block rules — deposit-only activation blocks, the data-availability footprint, and pricing against the block's L1 information — as they apply to MegaETH blocks; and the value transfers whose overflow lies outside the specification.
 
 ## Motivation
 
@@ -66,6 +66,12 @@ The rules of this page apply to every block from Satin's activation on (see [Act
   The data-availability footprint gas scalar is the exception: it MUST be read from the contract again before each non-deposit transaction, a Mega System Transaction included.
   The contract's slots are read as the base layer's fee computation and footprint read them, when they need them; that every slot either read makes is in the block's witness is specified in [The Stateless Witness](block/stateless-witness.md) (`SATIN-WIT-011`).
 
+### Outside the specification
+
+- `SATIN-BASE-011` A state from which a transaction's execution reaches a value transfer that would push the recipient's balance above 2^256 − 1 is an invalid prestate, and the execution of such a transaction lies outside this specification, whatever it would do next.
+  This holds for every value transfer: a transaction's value, a deposit's included, a `CALL`'s value, a `SELFDESTRUCT`'s balance sent to its beneficiary, and a creation's endowment of the account it creates.
+  A deposit's mint that would overflow its sender's balance is the same case, stated in [Deposit Transactions](block/deposits.md) (`SATIN-DEP-011`).
+
 ## Constants
 
 | Constant                 | Value                                        | Description                                                         |
@@ -100,6 +106,10 @@ A fixed zero keeps the opcode a function of nothing a validator must be given, a
 The Karst rule reads the scalar per transaction, and a Mega System Transaction can sit between two user transactions; reading it again for each one keeps the footprint of every transaction the one the state before it implies.
 The other L1 fields are fixed for the block once its L1 attributes deposit and the deposits before the first user transaction have run.
 
+**Why is a value transfer that overflows its recipient's balance outside the specification?**
+No chain can reach it: all the ether in existence is about 1.2 × 10^26 wei, far below 2^256, and every balance is part of it.
+Implementations differ on it — one saturates the recipient's balance, one wraps it, one fails the call — and defining one would bind every node to a behaviour no block can exercise; a deposit's mint is outside the specification for the same reason (`SATIN-DEP-011`).
+
 **Why do the footprint and the operator fee cost nothing at activation?**
 Satin starts from the L1 block contract the Rex era left, whose footprint and operator fee scalars are zero (see [Activation and Rex-Era Carry-Over](block/activation.md)); both take effect once that contract is upgraded and the scalars are set, which Satin itself does not do.
 
@@ -114,4 +124,4 @@ Satin starts from the L1 block contract the Rex era left, whose footprint and op
 ## Spec History
 
 - [Rex6](../upgrades/rex6.md) — The Rex era builds on Optimism Isthmus (Ethereum Prague); `DUPN`, `SWAPN`, `EXCHANGE` and `SLOTNUM` are undefined there.
-- [Satin](../upgrades/satin.md) — Optimism Karst (Ethereum Osaka) as the base, four added opcodes, no EIP-7825 or EIP-8037 transaction cap.
+- [Satin](../upgrades/satin.md) — Optimism Karst (Ethereum Osaka) as the base, four added opcodes, no EIP-7825 or EIP-8037 transaction cap; a value transfer that would overflow its recipient's balance outside the specification.

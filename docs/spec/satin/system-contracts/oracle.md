@@ -37,13 +37,13 @@ Without exact rules for when a read asks the service, what it costs, and when a 
   The service's value MUST win over whatever the slot holds at the read, a value the Oracle's own frame wrote earlier in the transaction included; with no value from the service the read MUST push the slot's present value, that write included.
 - `SATIN-ORCL-003` Every such read MUST be charged as a cold storage access, `COLD_SLOAD_COST`, however often the slot was read before, and the slot MUST be loaded whichever source answers, so that a later access finds it warm and a stateless witness carries it.
   The read is a read of volatile data for [gas detention](../evm/gas-detention.md), under the Oracle's cap.
-- `SATIN-ORCL-004` The read MUST be made before the cold access is charged: the slot is loaded, the service asked when the read is one that asks it, and the read marked for gas detention (`SATIN-DET-003`), and only then is `COLD_SLOAD_COST` charged.
-  A frame whose regular gas, its withheld part included, cannot pay the cold access MUST therefore load the slot, ask the service where it is asked, and mark the read, and then run out of gas at the `SLOAD`; the mark MUST stand for the rest of the transaction, though the frame halts.
+- `SATIN-ORCL-004` The read MUST be made before the cold access is charged: the slot is loaded, the service asked when the read is one that asks it, and the read marked for gas detention (`SATIN-DET-003`), and only then is `COLD_SLOAD_COST` charged, as one charge, its warm base of 100 included: no part of the `SLOAD`'s gas is charged before the read.
+  A frame whose regular gas, its withheld part included, cannot pay the cold access — whether it holds fewer than the 100 of the warm base or from 100 to 2,099 — MUST therefore load the slot, ask the service where it is asked, and mark the read, and then run out of gas at the `SLOAD`; the mark MUST stand for the rest of the transaction, though the frame halts.
   When the charge is gas detention's crossing (`SATIN-DET-018`) — the spendable part cannot pay it but the whole regular gas can — the frame is stopped and the `SLOAD` does not complete, and the slot stays loaded and the read marked all the same.
   A read refused because the frame's volatile-data access is off (see [MegaAccessControl](mega-access-control.md)) MUST NOT ask the service, and marks nothing.
 - `SATIN-ORCL-005` During a system call, a deposit or a Mega System Transaction the node MUST NOT ask the oracle service for a value: an `SLOAD` in the Oracle's own frame MUST push the slot's value on the chain — its present value, a write made earlier in the same call or transaction included (`SATIN-ORCL-002`) — and MUST be loaded, priced and marked as any Oracle read is (`SATIN-ORCL-003`, `SATIN-ORCL-004`).
   Only the reads of a transaction that is neither a deposit nor a Mega System Transaction ask the service; the rule holds for the whole of the system call or transaction it covers and ends with it.
-  The rule concerns reads: a `sendHint` call made in such a call or transaction is admitted, forwarded and counted as `SATIN-ORCL-006` to `SATIN-ORCL-010` state, and asks the service for no value.
+  The rule concerns reads: a `sendHint` call made in such a call or transaction is admitted, forwarded and counted by the rules of Hints below, as in any transaction, and asks the service for no value.
   It follows that no read of the block in which Satin activates asks the service: that block admits only deposits (see [Base Layer](../base-layer.md), `SATIN-BASE-006`, `SATIN-BASE-008`).
 
 ### Persistence of served values
@@ -65,7 +65,9 @@ Without exact rules for when a read asks the service, what it costs, and when a 
 - `SATIN-ORCL-008` Only a `CALL` or a `STATICCALL` whose target is the Oracle and whose input's first four bytes are the selector of `sendHint(bytes32,bytes)` is a `sendHint` call.
   A `CALLCODE` or `DELEGATECALL` of the method — `multiCall`'s payloads among them — runs the Oracle's bytecode in a frame of the caller's own context, MUST NOT reach the service and MUST count nothing.
 - `SATIN-ORCL-006` A `sendHint` call MUST be admitted, and its hint forwarded to the oracle service synchronously, when it is called, before the call returns, only when both of the following hold: the call is forwarded more than zero gas, and the frame that makes it has its volatile-data access on (see [MegaAccessControl](mega-access-control.md)); whether the call carries value does not matter.
-  A call that fails any of them MUST drop the hint and count nothing.
+  The gas is the regular gas the call is forwarded before any stipend is added, `min(requested_gas, forwarded_gas_cap)` for a call opcode (see [Gas Forwarding](../evm/gas-forwarding.md), `SATIN-FWD-003`): a value call's `CALL_STIPEND` is not forwarded gas (`SATIN-DET-010`), so a value-transferring `CALL` that requests no gas runs on the stipend alone, and its hint MUST be dropped.
+  A `sendHint` that is the transaction's own call, a deposit's included, is forwarded its first frame's whole regular gas, since no stipend applies there (`SATIN-FWD-003` adds `CALL_STIPEND` only for the opcodes): it is admitted whenever that gas is more than zero, whether or not the transaction carries value.
+  A call that fails either condition MUST drop the hint and count nothing.
   Whether admitted or not, the call then runs the Oracle's bytecode, but in the case of the rule `SATIN-ORCL-010` below.
 - `SATIN-ORCL-007` The service MUST be handed the hint's `topic`, its `data`, and the address of the frame that made the call: the transaction's sender for a `sendHint` that is the transaction's own call.
 - `SATIN-ORCL-009` An admitted call MUST count its whole input length as data size on the transaction, before the input is decoded, on no frame's budget, and MUST pay no history gas.
@@ -83,6 +85,7 @@ Without exact rules for when a read asks the service, what it costs, and when a 
 | `ORACLE_CONTRACT_ADDRESS` | `0x6342000000000000000000000000000000000001`                         | The Oracle                                      |
 | `ORACLE_CODE_HASH`        | `0x71a65239db8d0f1bb765fad36e34f57600420d103a4401ef7555bd50b229dc55` | Code hash of the Oracle version 2.0.0           |
 | `COLD_SLOAD_COST`         | 2,100                                                                | The gas of a cold `SLOAD`, its warm base included |
+| `CALL_STIPEND`            | 2,300                                                                | The stipend a value call adds to its child, which is not forwarded gas ([Gas Forwarding](../evm/gas-forwarding.md)) |
 
 ## Rationale
 
@@ -109,6 +112,16 @@ A transaction that reads 7, writes 8 to the slot by a restricted write the Oracl
 **Why does an unaffordable Oracle read still ask the service and mark the read?**
 Rex6 made the read, and registered it for detention, before charging its cold access, so that a frame which then runs out of gas leaves the registration standing for the rest of the transaction; Satin keeps that order, and loads the slot as every Oracle read does.
 
+**Why is nothing of the 2,100 charged before the read, the warm base included?**
+`COLD_SLOAD_COST` is one charge of 2,100, the warm base's 100 included, and the read comes before all of it, as in Rex6, which charges the `SLOAD`'s static gas after the host's read; a node that charges the 100 first runs a frame short of it out of gas with nothing read, and marks each read it does make at a compute 100 higher than this specification's.
+A worked example: an Oracle `SLOAD` is reached at a transaction compute of 3,000, with no earlier volatile read and the frame's spendable gas its whole regular gas.
+- With 50 gas left, fewer than the warm base's 100, the slot is loaded, the service asked where `SATIN-ORCL-005` lets it be asked, and the read marked at a `compute_at_read` of 3,000, which sets the transaction's limit to 3,000 + 20,000,000 (`ORACLE_ACCESS_COMPUTE_GAS`, see [Gas Detention](../evm/gas-detention.md)) = 20,003,000; the `SLOAD` then runs out of gas, and the 50 the frame burns are not compute (`SATIN-DET-011`).
+- With any amount from 100 to 2,099 left, the same: the slot loaded, the service asked, the read marked at 3,000 and the limit 20,003,000, and then out of gas.
+- With 2,100 or more left, the same read and mark at 3,000, and then the 2,100 is charged and the `SLOAD` pushes its value, the compute rising to 5,100.
+
+In each case `compute_at_read` is the compute before the 2,100.
+Were the transaction's limit close enough that the spendable part could not pay the 2,100 while the whole regular gas could, the third case would be gas detention's crossing instead, and the frame would be stopped after the read (`SATIN-ORCL-004`).
+
 **Why do system calls, deposits and Mega System Transactions not ask the service?**
 A value the service gives must be on-chain before its reader, and none of these can have a Mega System Transaction ordered before it to put it there.
 A pre-block call must be a function of the state a stateless validator is given, which carries no service answer for a step before the block's transactions.
@@ -126,7 +139,12 @@ Two reasons, each on its own: a payload forwarded to the service cannot be taken
 A hint is not appended to history, so it pays no history gas; it is data the node handled, so it counts as data size.
 
 **Why does a value-bearing hint still reach the service?**
-Admission is decided before the bytecode runs, on the call's gas, its selector and the caller's access switch, as Rex6 decides it; a value call to the `view` method then reverts in the bytecode, but the hint was already handed over, as for any admitted hint whose call later fails.
+Admission is decided before the bytecode runs, on the call's gas, its selector and the caller's access switch, as Rex6 decides it, but for a value call's stipend (below); a value call to the `view` method then reverts in the bytecode, but the hint was already handed over, as for any admitted hint whose call later fails.
+
+**Why is a value call's stipend not the hint's gas?**
+The gas condition asks whether the caller gave the call gas; the stipend is the protocol's addition to a value call, not gas the caller forwards (`SATIN-DET-010`), so a value call that requests none forwards none, and its hint is dropped as any call's with no gas is.
+A transaction's own call has no stipend, and the gas it is forwarded is its first frame's whole regular gas: subtracting a stipend there would drop the hint of a transaction whose first frame holds 2,300 gas or less, a deposit's included, and undercount the data size the block keeps.
+Rex6's node judged a call's gas with its stipend added, so it admitted the hint of a value `CALL` that requests no gas; Satin drops that hint, and admits every other hint Rex6 admits.
 
 **Why is a hint over the data-size limit a stop of its call?**
 Rex6 counted such a hint's bytes and halted the transaction with the data-size failure.
@@ -139,6 +157,8 @@ Satin counts none of them and stops only the call: the payload never left the no
 - A sequencer that includes a transaction without persisting before it a served value the transaction's own writes do not explain, or a transaction whose reads of a slot no value written before it reproduces, produces a block every replaying node computes differently.
 - A node that does not count a hint, or counts it only once it decoded, lets a transaction push data to the service past its data-size limit; one that takes the count back when the frame fails lets a transaction send unbounded hints from frames it then reverts.
 - A node that forwards a hint the transaction's data-size limit refuses sends a payload the chain never accounted for.
+- A node that counts a value call's stipend as a hint's gas, or subtracts one from a transaction's own call, admits or drops hints other nodes do not, and reports another data size for the transaction and the block.
+- A node that charges any part of an Oracle read's 2,100 before the read runs a frame short of it out of gas with no read made, or marks the read later, and so computes another detention limit than every other node.
 - The Oracle's restricted writes run their body before the authorization check, so an unauthorized caller pays for the writes and logs it attempts before the call reverts; a node that checked authorization first would charge such a caller less than the bytecode does and compute another gas used.
   At the transaction boundary no slot is written and no log is emitted by an unauthorized caller.
 
@@ -149,4 +169,4 @@ Satin counts none of them and stops only the call: the payload never left the no
 - [Rex3](../../upgrades/rex3.md) — Made Oracle detention triggered by an `SLOAD` of the Oracle's storage.
 - [Rex5](../../upgrades/rex5.md) — Oracle version 2.0.0 reads its authority from the SequencerRegistry; hint forwarding gated on a positive gas limit and counted before decoding.
 - [Rex6](../../upgrades/rex6.md) — No hint from a frame whose volatile-data access is off; the Rex6 Oracle is specified in [Oracle](../../system-contracts/oracle.md).
-- [Satin](../../upgrades/satin.md) — Every read loads the slot, system calls, deposits and Mega System Transactions ask the service nothing (so neither does the block in which Satin activates), a value a read was given but did not push may be persisted, a hint over the data-size limit is a stop of its call, and a transaction whose reads of a slot no value written before it reproduces, its own writes included, is left out; served values are persisted before their readers, as under Rex6, but for a value the reader's own earlier write explains.
+- [Satin](../../upgrades/satin.md) — Every read loads the slot, system calls, deposits and Mega System Transactions ask the service nothing (so neither does the block in which Satin activates), a value a read was given but did not push may be persisted, a hint over the data-size limit is a stop of its call, a hint's gas is the gas its call is forwarded before any stipend, and a transaction whose reads of a slot no value written before it reproduces, its own writes included, is left out; served values are persisted before their readers, as under Rex6, but for a value the reader's own earlier write explains.
