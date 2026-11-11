@@ -70,7 +70,7 @@ interface IKeylessDeploy {
 | ---- | --------------- | ------- |
 | step-1 | Charge `KEYLESS_DEPLOY_OVERHEAD_GAS` of regular gas | Out of gas |
 | step-2 | The call carries no value | `NoEtherTransfer()`, answered before the call's frame is built (see `SATIN-KEY-018`): no value moves |
-| step-3 | The first argument — the call's arguments decoded as `(bytes, uint256)` when it was recognized (`SATIN-ICPT-006`) — decodes as a signed legacy transaction that is a creation (`to` empty), carries no chain id, and is followed by no trailing byte | In this order: `MalformedEncoding()` for an RLP encoding that does not decode or has trailing bytes, then `NotContractCreation()` for a transaction with `to` set, then `NotPreEIP155()` for one with a chain id |
+| step-3 | The first argument — the `bytes` the call's arguments held when it was recognized, the length bytes after the length word that `SATIN-ICPT-006`'s offset points at, unpadded — decodes as a signed legacy transaction that is a creation (`to` empty), carries no chain id, and is followed by no trailing byte | In this order: `MalformedEncoding()` for an RLP encoding that does not decode or has trailing bytes, then `NotContractCreation()` for a transaction with `to` set, then `NotPreEIP155()` for one with a chain id |
 | step-4 | The carried transaction's nonce is 0 | `NonZeroTxNonce(uint64)` |
 | step-5 | The initcode is at most `MAX_INITCODE_SIZE` bytes | `InitCodeTooLarge(uint64,uint64)` |
 | step-6 | `gasLimitOverride` (read as `MAX_UINT64` when larger) is at least the signed gas limit | `GasLimitTooLow(uint64,uint64)` |
@@ -98,6 +98,7 @@ interface IKeylessDeploy {
   The rule concerns the deploy address alone: a creation the constructor itself makes may return empty code.
 - `SATIN-KEY-010` A signer that is the block beneficiary MUST be detained as a read of the beneficiary's account, made when the signer's account is read, after step 7 recovered the signer and before step 8's check; the read's compute is the call's `KEYLESS_DEPLOY_OVERHEAD_GAS` of step 1, so the limit it sets is that plus the cap, unless an earlier read set a lower limit (see [Gas Detention](../evm/gas-detention.md)).
 - `SATIN-KEY-018` A call that carries value MUST first be held to gas detention for step 1's charge: when that charge is the crossing, the call is stopped with `MegaLimitExceeded(2, limit)` and none of it is billed; otherwise the charge is made (or halts the call out of gas) and the call reverts with `NoEtherTransfer()` before any value moves and before any frame is built.
+  This holds whether or not the caller can fund the value: steps 1 and 2 are part of interception, which comes before the frame start where the funds are checked (`SATIN-ICPT-007`).
 
 ### The creation
 

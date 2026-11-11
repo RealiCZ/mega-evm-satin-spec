@@ -68,13 +68,14 @@ Without exact rules for when a read asks the service, what it costs, and when a 
   The gas limit is the regular gas the call's frame starts with, a value call's stipend included, as Rex6 judges it: for a call opcode `min(requested_gas, forwarded_gas_cap)` plus `CALL_STIPEND` for a value-transferring `CALL` (see [Gas Forwarding](../evm/gas-forwarding.md), `SATIN-FWD-003`), so a value-transferring `CALL` that requests no gas starts its frame on the stipend, and its hint is admitted and counted.
   A `sendHint` that is the transaction's own call, a deposit's included, has no stipend (`SATIN-FWD-003` adds `CALL_STIPEND` only for the opcodes) and is judged on its first frame's whole regular gas: it is admitted whenever that gas is more than zero, whether or not the transaction carries value.
   A call that fails either condition MUST drop the hint and count nothing.
-  Whether admitted or not, the call then runs the Oracle's bytecode, but in the case of the rule `SATIN-ORCL-010` below.
+  Whether admitted or not, the call then reaches its frame start and runs the Oracle's bytecode, unless the rule `SATIN-ORCL-010` below answers it first.
+  Admission comes before the frame start, where the caller's funds are checked (`SATIN-ICPT-007`): a `sendHint` carrying a value its caller cannot fund is admitted, forwarded and counted as any hint is, and its frame start then refuses the call, which fails with empty return data and runs no bytecode (`SATIN-OUT-010`); the hint stays counted (`SATIN-ORCL-009`).
 - `SATIN-ORCL-007` The service MUST be handed the hint's `topic`, its `data`, and the address of the frame that made the call: the transaction's sender for a `sendHint` that is the transaction's own call.
 - `SATIN-ORCL-009` An admitted call MUST count its whole input length as data size on the transaction, before the input is decoded, on no frame's budget, and MUST pay no history gas.
   A `sendHint` that is the transaction's own call MUST count its input twice: once as calldata in the transaction's body, and once as the hint.
   An admitted input MUST stay counted whatever the calling frame or the transaction does afterwards — a revert, a halt, a later stop, a failed deposit — and that includes an input that does not decode as `sendHint(bytes32,bytes)`, which reaches no service.
 - `SATIN-ORCL-010` A `sendHint` call whose input length would take the transaction's data size over its data-size limit (see [Resource Limits](../evm/resource-limits.md)) MUST NOT be forwarded and MUST NOT be counted.
-  The call MUST be answered with the data-size stop, `MegaLimitExceeded(0, limit)` (see [Limit Stops](../evm/limit-stops.md)), without running the Oracle's bytecode; the stop is the call's, which its caller can catch, and when the call is the transaction's own frame, the stop the transaction reports counts the data size the hint would have reached as used.
+  The call MUST be answered with the data-size stop, `MegaLimitExceeded(0, limit)` (see [Limit Stops](../evm/limit-stops.md)), without running the Oracle's bytecode, whether or not its caller can fund the value it carries: the check is made at admission, before the frame start (`SATIN-ICPT-007`); the stop is the call's, which its caller can catch, and when the call is the transaction's own frame, the stop the transaction reports counts the data size the hint would have reached as used.
   The data size the transaction keeps, which the block's data-size budget counts, holds none of the hint's bytes.
   The check is against the transaction's limit alone: a hint's bytes are on no frame's budget.
 
@@ -140,6 +141,7 @@ A hint is not appended to history, so it pays no history gas; it is data the nod
 
 **Why does a value-bearing hint still reach the service?**
 Admission is decided before the bytecode runs, on the call's gas limit, its selector and the caller's access switch, as Rex6 decides it, a value call's stipend included (below); a value call to the `view` method then reverts in the bytecode, but the hint was already handed over, as for any admitted hint whose call later fails.
+A call whose caller cannot fund the value is no different: Rex6 ran its interceptors before it built the call's frame, where the funds are checked, so the hint is handed over and counted, and only then does the call fail for its value (`SATIN-ICPT-007`).
 
 **Why does a value call's stipend count toward the hint's gas?**
 Rex5 made a hint wait for gas to close a free side channel: a call with no gas cannot run the Oracle's bytecode, so its frame fails at once while its payload would still reach the service.
@@ -158,6 +160,7 @@ Satin counts none of them and stops only the call: the payload never left the no
 - A sequencer that includes a transaction without persisting before it a served value the transaction's own writes do not explain, or a transaction whose reads of a slot no value written before it reproduces, produces a block every replaying node computes differently.
 - A node that does not count a hint, or counts it only once it decoded, lets a transaction push data to the service past its data-size limit; one that takes the count back when the frame fails lets a transaction send unbounded hints from frames it then reverts.
 - A node that forwards a hint the transaction's data-size limit refuses sends a payload the chain never accounted for.
+- A node that checks a `sendHint`'s funds before admitting it drops a hint every other node forwards and counts when the caller cannot fund the value, and reports another data size for the transaction and the block.
 - A node that leaves a value call's stipend out of a hint's gas, or subtracts one from a transaction's own call, drops hints other nodes admit, and reports another data size for the transaction and the block.
 - A node that charges any part of an Oracle read's 2,100 before the read runs a frame short of it out of gas with no read made, or marks the read later, and so computes another detention limit than every other node.
 - The Oracle's restricted writes run their body before the authorization check, so an unauthorized caller pays for the writes and logs it attempts before the call reverts; a node that checked authorization first would charge such a caller less than the bytecode does and compute another gas used.
