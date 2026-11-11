@@ -10,7 +10,7 @@ maturity: unstable
 **Unstable** — Satin is under active development: everything on this page may change before Satin is frozen.
 {% endhint %}
 
-Abstract: The generic mechanism by which a node answers a call to a system contract's intercepted method itself: which calls are intercepted, what falls through to the contract's bytecode, the call-depth gate, the value policy, and how an interceptor's answer returns to its caller and is held to gas detention.
+Abstract: The generic mechanism by which a node answers a call to a system contract's intercepted method itself: which calls are intercepted, what falls through to the contract's bytecode, the call-depth gate, the order of a call's decisions, the value policy, and how an interceptor's answer returns to its caller and is held to gas detention.
 
 ## Motivation
 
@@ -37,8 +37,24 @@ The node must then agree with every other node on exactly which calls it answers
 The High-Precision Timestamp and the SequencerRegistry have no interceptor.
 KeylessDeploy has none either: its `keylessDeploy` call is recognized by the rule below and deployed natively.
 
-- `SATIN-ICPT-006` A `keylessDeploy(bytes,uint256)` call MUST be recognized by its depth (0, the transaction's own frame), its scheme (`CALL`), its target (`KEYLESS_DEPLOY_ADDRESS`), its selector, and its arguments, which MUST decode under the Solidity ABI as `(bytes, uint256)`, bytes that follow a valid encoding not preventing it, whatever code the state holds at the address; what such a call does is specified in [KeylessDeploy](keyless-deploy.md).
-  A call with the selector whose arguments do not decode is not recognized: the node charges it nothing, and it runs KeylessDeploy's bytecode, as every other call to KeylessDeploy does.
+- `SATIN-ICPT-006` A `keylessDeploy(bytes,uint256)` call MUST be recognized by its depth (0, the transaction's own frame), its scheme (`CALL`), its target (`KEYLESS_DEPLOY_ADDRESS`), its selector, and its arguments, whatever code the state holds at the address; what such a call does is specified in [KeylessDeploy](keyless-deploy.md).
+  The arguments MUST be accepted exactly when KeylessDeploy's own compiled calldata decoder for `(bytes calldata, uint256)` accepts them, that is when the input after the selector, each word read as a 32-byte big-endian integer, meets all of the following:
+  1. it holds a head of at least 64 bytes, two 32-byte words;
+  2. the head's first word, the offset of the `bytes`, is below 2^64;
+  3. the word that starts at that offset, the length of the `bytes`, is below 2^64;
+  4. offset + 32 + length is at most the length of the input after the selector; the `bytes` are the length bytes that follow the length word;
+  5. nothing more is required: the `bytes` need no padding to a whole word, the offset need not be the canonical 64 and may point into the head, trailing bytes after the encoding are allowed, and the head's second word, `gasLimitOverride`, may hold any value.
+
+  A call with the selector whose arguments the decoder refuses is not recognized: the node charges it nothing, and it runs KeylessDeploy's bytecode, as every other call to KeylessDeploy does; the bytecode's decoder refuses the same arguments, so the call reverts with empty data.
+
+The table below is informative: each input is the selector followed by the words and bytes shown, `word(x)` being `x` as a 32-byte big-endian word and `gas` any `gasLimitOverride`, sent by a transaction's own `CALL` without value.
+
+| Arguments after the selector | Recognized | What follows |
+| ---------------------------- | ---------- | ------------ |
+| `word(0x40)`, `word(gas)`, `word(5)`, 5 bytes: the tail padding cut | Recognized | The deployment's steps run, step 3 reading the 5 bytes |
+| `word(0x20)`, `word(3)`, 3 bytes: the offset points at the second head word, which is read as the length | Recognized | The first argument is the 3 bytes, and `gasLimitOverride` is 3 |
+| `word(0)`, `word(gas)`: offset zero, so the first head word is read as the length, and the `bytes` are empty | Recognized | Step 1 charges the overhead, and step 3 refuses the empty argument with `MalformedEncoding()` |
+| The first input one byte short of its declared length: `word(0x40)`, `word(gas)`, `word(5)`, 4 bytes | Not recognized | KeylessDeploy's bytecode runs and reverts with empty data; the node charges nothing |
 
 ### The call-depth gate
 
@@ -46,11 +62,22 @@ KeylessDeploy has none either: its `keylessDeploy` call is recognized by the rul
   It MUST be answered as any call past the call-stack limit is, with the depth failure, its forwarded gas and its reservoir share returned to the caller whole, no interceptor effect made and no hint forwarded or counted.
   The depth gate comes before every other decision about the call, a limit included: a call past the depth limit counts no start toward any limit and cannot be stopped by one.
 
+### The order of a call's decisions
+
+- `SATIN-ICPT-007` Once the call opcode's own charges are made (`SATIN-ICPT-004`), a `CALL` or `STATICCALL` MUST be decided in this order: first the depth gate (`SATIN-ICPT-002`); then interception, which is every interceptor's answer, its value policy included (`SATIN-ICPT-003`), the admission of a `sendHint` and the data-size check of its input ([Oracle](oracle.md)), and the `keylessDeploy` recognition (`SATIN-ICPT-006`) with steps 1 and 2 of the deployment ([KeylessDeploy](keyless-deploy.md)); and only then the frame start, where the caller's funds are checked and the value moves ([Resource Limits](../evm/resource-limits.md), `SATIN-LIM-013`, `SATIN-LIM-015`).
+  Interception therefore comes before the funds check, and whether the caller can fund the call's value changes nothing interception does:
+  - a `sendHint` carrying a value its caller cannot fund is admitted, forwarded and counted as any hint is, and then its frame start refuses the call for the value, which fails with empty return data (`SATIN-OUT-010`), the hint staying counted;
+  - a `sendHint` whose input would take the transaction over its data-size limit is answered `MegaLimitExceeded(0, limit)`, nothing forwarded or counted (`SATIN-ORCL-010`), whether or not its caller can fund its value;
+  - an intercepted method of MegaAccessControl or MegaLimitControl called with value is answered `NonZeroTransfer()` (`SATIN-ICPT-003`), whether or not its caller can fund the value;
+  - a recognized `keylessDeploy` call carrying value is charged step 1's overhead and answered `NoEtherTransfer()` (`SATIN-KEY-018`), whether or not its caller can fund the value.
+
+  A transaction's own frame that its authorization list stops before it runs (`SATIN-AUTH-010`) is stopped before any of these, and reaches no interceptor.
+
 ### The value policy
 
-- `SATIN-ICPT-003` An intercepted method of MegaAccessControl or MegaLimitControl called with a non-zero value MUST be answered with a revert whose data is `NonZeroTransfer()`, before any value moves; the method's own answer is not made.
+- `SATIN-ICPT-003` An intercepted method of MegaAccessControl or MegaLimitControl called with a non-zero value MUST be answered with a revert whose data is `NonZeroTransfer()`, before any value moves and whether or not the caller can fund the value (`SATIN-ICPT-007`); the method's own answer is not made.
   The policy applies once the selector matched: a call carrying value to a selector the contract does not intercept runs the bytecode.
-  A `sendHint` carrying value is admitted as any hint is, and then runs the Oracle's bytecode (see [Oracle](oracle.md)).
+  A `sendHint` carrying value is admitted as any hint is, and then runs the Oracle's bytecode, or, when its caller cannot fund the value, fails at its frame start, the hint counted all the same (see [Oracle](oracle.md)).
 
 ### The answer
 
@@ -72,6 +99,11 @@ KeylessDeploy has none either: its `keylessDeploy` call is recognized by the rul
 By then the call opcode has made its own charges, so the answer needs no accounting of its own, and no frame is created only to be discarded.
 The answer then returns exactly as a frame's result would, so the caller settles it with the rules every call follows.
 
+**Why intercept before the frame start, the funds check included?**
+Rex6 ran its interceptors before it built the call's frame, and building the frame is where the caller's funds were checked and the value moved; Satin keeps that order (`SATIN-ICPT-007`).
+No answer moves value, so whether the caller could fund the value bears on no answer: a value call to MegaAccessControl or MegaLimitControl is refused with `NonZeroTransfer()`, and a keyless call with `NoEtherTransfer()`, on every node alike.
+A hint is handed to the service when it is admitted, before the frame start can refuse the call, and stays counted, as any admitted hint whose call later fails does.
+
 **Why not intercept `DELEGATECALL` or `CALLCODE`?**
 Both run the target's code in the caller's context: the caller's address, value and storage.
 An interceptor answering them would act for the wrong account, so they run the bytecode, whose fallback answers `NotIntercepted()` or whose method is a no-op.
@@ -79,6 +111,12 @@ An interceptor answering them would act for the wrong account, so they run the b
 **Why decode a keyless call's arguments before recognizing it?**
 Rex6 decoded the outer call before its interceptor took it, so a call whose arguments did not decode reached KeylessDeploy's bytecode, which reverts, and was charged no dispatch overhead.
 Satin keeps that boundary: only a call the deployment can read is a deployment, and only it pays step 1's overhead ([KeylessDeploy](keyless-deploy.md)).
+
+**Why recognize exactly the arguments the contract's own decoder accepts?**
+KeylessDeploy's method takes `bytes calldata`, and its compiled decoder accepts exactly the inputs of `SATIN-ICPT-006`'s five conditions; Rex6's node decoded the arguments without checking that their encoding was canonical, which accepts the same inputs.
+With that set, a `keylessDeploy` call a transaction makes has two outcomes: the node recognizes it and the deployment's steps run, or the node does not, and the bytecode's decoder refuses it with empty data, nothing charged.
+A stricter test — a canonical offset, padded bytes, no trailing bytes — would add a third: a call the node does not recognize whose arguments the bytecode reads, so that it reaches the method's body and reverts with `NotIntercepted()`, a transaction's deployment answered as a contract's call is.
+A looser test would charge the overhead to calls the contract cannot read.
 
 **Why gate on depth first?**
 The depth failure of an ordinary call is decided when its frame is built, after interception; without the gate an interceptor could answer at a depth no other call can reach.
@@ -94,6 +132,8 @@ Treating the whole spend as the charge that crossed keeps the stop's compute equ
 - An interceptor that consumed calls to unknown selectors would hide them from the bytecode, which answers them with a stable error; a contract relying on that error would then see a silent success.
 - An interceptor reachable through `DELEGATECALL` would switch volatile-data access, or report gas, for a frame that is not the caller's.
 - A node that answered a value-bearing intercepted call with success would let value reach a system contract that has no method to return it.
+- A node that checked the caller's funds before interception would answer an unfunded value call to MegaAccessControl or MegaLimitControl with empty data instead of `NonZeroTransfer()`, and would drop a hint every other node forwards and counts, reporting another data size for the transaction and the block.
+- A node whose keyless recognition were stricter or looser than the contract's decoder would run the bytecode where every other node deploys, or charge an overhead no other node charges.
 - A node that billed part of an answer that crossed detention's limit would let a transaction compute past its limit by that part.
 
 ## Spec History
