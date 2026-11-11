@@ -134,6 +134,7 @@ Treating the whole spend as the charge that crossed keeps the stop's compute equ
 - A node that answered a value-bearing intercepted call with success would let value reach a system contract that has no method to return it.
 - A node that checked the caller's funds before interception would answer an unfunded value call to MegaAccessControl or MegaLimitControl with empty data instead of `NonZeroTransfer()`, and would drop a hint every other node forwards and counts, reporting another data size for the transaction and the block.
 - A node whose keyless recognition were stricter or looser than the contract's decoder would run the bytecode where every other node deploys, or charge an overhead no other node charges.
+- The five conditions of `SATIN-ICPT-006` define the recognized set, not any decoder library: a node that takes the set from a library keeps it to those conditions whichever version of the library resolves, and never uses a strict or validating mode, which would refuse a non-canonical offset, unpadded bytes or trailing bytes and run the bytecode where every other node deploys.
 - A node that billed part of an answer that crossed detention's limit would let a transaction compute past its limit by that part.
 
 ## Spec History
