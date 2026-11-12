@@ -62,7 +62,7 @@ interface IKeylessDeploy {
 ### The steps
 
 - `SATIN-KEY-004` A deployment MUST make the charges and checks of the table below.
-  A step's refusal MUST revert the call with the error the table names: the state and history gas the call was charged MUST be given back into the call's reservoir, never its regular gas (`SATIN-HIST-012`), and the regular gas it spent stays spent.
+  A step's refusal MUST revert the call with the error the table names: the state and history gas the call was charged MUST be given back into the call's reservoir (`SATIN-HIST-012`), and the regular gas it spent stays spent.
   A step that cannot pay its charge MUST halt the call out of gas, consuming the call's regular gas.
 - `SATIN-KEY-005` The steps, in this order:
 
@@ -98,7 +98,7 @@ interface IKeylessDeploy {
   The rule concerns the deploy address alone: a creation the constructor itself makes may return empty code.
 - `SATIN-KEY-010` A signer that is the block beneficiary MUST be detained as a read of the beneficiary's account, made when the signer's account is read, after step 7 recovered the signer and before step 8's check; the read's compute is the call's `KEYLESS_DEPLOY_OVERHEAD_GAS` of step 1, so the limit it sets is that plus the cap, unless an earlier read set a lower limit (see [Gas Detention](../evm/gas-detention.md)).
 - `SATIN-KEY-018` A call that carries value MUST first be held to gas detention for step 1's charge: when that charge is the crossing, the call is stopped with `MegaLimitExceeded(2, limit)` and none of it is billed; otherwise the charge is made (or halts the call out of gas) and the call reverts with `NoEtherTransfer()` before any value moves and before any frame is built.
-  This holds whether or not the caller can fund the value: steps 1 and 2 are part of interception, which comes before the frame start where the funds are checked (`SATIN-ICPT-007`).
+  Steps 1 and 2 are part of interception, which comes before the frame start where the funds are checked (`SATIN-ICPT-007`).
 
 ### The creation
 
@@ -115,7 +115,7 @@ interface IKeylessDeploy {
 
   The signer's write record MUST be counted after that rule: when the nonce set back leaves the signer's account as the transaction loaded it, no record stands, and the history gas step 14 charged for it MUST be given back into the call's reservoir; a signer's account another write changed — value a creation that returned without a revert or a halt moved out of it, or into it — keeps its record.
   When the signer's nonce stands where it was and step 10 charged state gas for the signer's account, that state gas MUST be given back into the call's reservoir.
-  No execution reaches that last case: step 10 charges only a signer empty under EIP-161, whose nonce is zero, and once steps 11 to 15 have passed the creation always bumps that nonce, which a deployment from nonce zero keeps; the sentence gives the case an answer, and no test can reach it.
+  That last case is reached by no execution under the current rules and constants: step 10 charges only a signer empty under EIP-161, whose nonce is zero, and once steps 11 to 15 have passed the creation always bumps that nonce, which a deployment from nonce zero keeps.
 
 ### The answer
 
@@ -129,8 +129,8 @@ interface IKeylessDeploy {
   The two pools MUST be netted together, not each clipped at zero: a creation that pays state from regular gas and reverts returns that state as reservoir, which lowers `gasUsed` by it; a creation whose constructor writes a fresh slot at `m = 1` from regular gas alone and reverts reports 12,109 for its regular charges, not 113,549.
   A constructor `ORIGIN; SELFDESTRUCT` (`0x32ff`) at `m = 1`, given 500,000 of regular gas and no reservoir, with a zero balance and the warm sender as beneficiary, spends 2 + 5,000 and receives step 14's 183,600 of state gas and 3,520 of history gas back into its reservoir; it returns 494,998 of regular gas and 187,120 of reservoir, and `gasUsed` is 5,002 + (0 − 187,120) + 187,120 = 5,002, not −182,118; the call answers `EmptyCodeDeployed(5002)` (`SATIN-KEY-009`).
   `gasUsed` is never less than the creation's regular charges, the regular gas it spent on anything but state and history: every give-back left in it is of a charge the creation made.
-- `SATIN-KEY-017` The node MUST NOT produce the errors `ParentBudgetExceeded(uint8,uint64,uint64)`, `InvalidTransaction()`, `InsufficientComputeGas(uint64,uint64)` or `InternalError()`, which the interface no longer declares: a database read or SALT lookup the node fails to make gives the transaction no outcome (see [Transaction Validation and Refusals](../block/transaction-validation.md)).
-  `AddressMismatch()` and `NoContractCreated()` remain the answers to a creation reported at another address or at none, which no deployment reaches.
+- `SATIN-KEY-017` The node MUST NOT produce the errors `ParentBudgetExceeded(uint8,uint64,uint64)`, `InvalidTransaction()`, `InsufficientComputeGas(uint64,uint64)` or `InternalError()`, which the interface no longer declares: a read the node fails to make is a fault (`SATIN-VAL-010`, see [Transaction Validation and Refusals](../block/transaction-validation.md)).
+  `AddressMismatch()` and `NoContractCreated()` remain the answers to a creation reported at another address or at none, a case reached by no execution under the current rules and constants.
 
 ### Limits
 
@@ -140,7 +140,7 @@ interface IKeylessDeploy {
   The signer's nonce record counted on the call at its settlement can cross the call's frame budget in data size and KV updates, its state-growth budget when the bump created the signer, and the transaction's data-size limit once Oracle hints the creation sent used what the transaction had left; when it does, the call MUST revert with that stop, and the deployment, the nonce included, is taken back.
   The call is the transaction's own frame, so a stop of the call is the transaction's result.
 
-### Retired rule ids
+### Retired ids
 
 None.
 

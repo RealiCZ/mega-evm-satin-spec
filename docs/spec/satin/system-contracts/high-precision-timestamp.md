@@ -34,7 +34,7 @@ The timestamp is served through the Oracle's storage; nodes and contracts must a
     - at least the snapshot any earlier transaction was given, of the same block or of an earlier one.
 
     The snapshot MUST be persisted before the transaction that read it unless that transaction's own write explains it (see [Oracle](oracle.md), `SATIN-ORCL-012`), and the protocol MUST NOT require a timestamp write for a transaction that does not read the timestamp.
-    During a system call, a deposit or a Mega System Transaction the service is not asked (`SATIN-ORCL-005`), and a read pushes the slot's value; so it is not asked in the block in which Satin activates, which holds only deposits.
+    A read made where the service is not asked (`SATIN-ORCL-005`) pushes the slot's value.
 - `SATIN-HPTS-002` The wrapper's reads of the Oracle's storage are Oracle reads: an `SLOAD` in the Oracle's own frame, reached through `getSlot`, MUST be answered by the oracle service, charged as a cold access and held to gas detention as [Oracle](oracle.md) and [Gas Detention](../evm/gas-detention.md) specify, and a frame whose volatile-data access is off MUST be refused it (see [MegaAccessControl](mega-access-control.md)).
 
 ## Constants

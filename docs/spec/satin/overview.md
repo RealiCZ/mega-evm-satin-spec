@@ -35,6 +35,8 @@ Tests, fixtures and reviews cite a rule by its id.
 [Satin Rules](rules.md) lists every id of the section with a one-line summary and a link to its home page.
 
 A page that gathers rules whose detail lives elsewhere — [Halts, Reverts and Stops](evm/outcomes.md), [Deposit Transactions](block/deposits.md) — states the unified rule once and links the page that holds the detail; no rule is stated twice.
+A worked example lives in the conformance cases (Mega EEST), not in a rule: the rule cites the case that pins an edge by its case id, as `satin/sstore/clear/specification-example`, and a case is added before the example it replaces leaves the text.
+A figure that motivates a rule may stay in an Abstract or a Rationale.
 
 ## Specifications
 

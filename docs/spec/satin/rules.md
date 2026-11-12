@@ -51,7 +51,7 @@ Home: [Two-Pool Gas](evm/gas-model.md)
 | [`SATIN-POOL-009`](evm/gas-model.md) | `GAS` MUST push the regular gas the frame has left, and MUST NOT include the reservoir. |
 | [`SATIN-POOL-010`](evm/gas-model.md) | The transaction's own frame MUST receive the whole reservoir left once the intrinsic state gas and the charges made before the first frame are paid, and a system call's outermost frame MUST receive the whole reservoir … |
 | [`SATIN-POOL-011`](evm/gas-model.md) | A child frame started by `CALL`, `CALLCODE`, `DELEGATECALL`, `STATICCALL`, `CREATE` or `CREATE2`, and the creation a keyless deployment starts (KeylessDeploy), MUST receive |
-| [`SATIN-POOL-012`](evm/gas-model.md) | When a start returns — whether it was answered without building a frame (a precompile, a call to an account with no code, an interceptor's answer, a call refused past the call-depth limit or for a value its caller … |
+| [`SATIN-POOL-012`](evm/gas-model.md) | When a start returns — whether it was answered without building a frame (a precompile, a call to an account with no code, an interceptor's answer, a refused start) or a built frame returned — the reservoir the child … |
 | [`SATIN-POOL-014`](evm/gas-model.md) | When a frame reverts, or is stopped by a limit, the state and history charges it made, and those its successful children merged into it, net of the give-backs it and they received (`SATIN-HIST-007`), MUST be given back … |
 | [`SATIN-POOL-015`](evm/gas-model.md) | When a start for which the caller charged an account leaf's state gas — a value `CALL` to an account that is empty under EIP-161, or a `CREATE` or `CREATE2` onto an address empty under EIP-161 — returns without that … |
 | [`SATIN-POOL-017`](evm/gas-model.md) | When a transaction ends, the reservoir left MUST return to the sender, and so MUST the unspent regular gas unless the transaction's own frame halted; this holds when the transaction's own frame reverted and when it was … |
@@ -126,7 +126,7 @@ Home: [History Gas and the History Allowance](evm/history-gas.md)
 | [`SATIN-HIST-004`](evm/history-gas.md) | The body — `TX_BODY_SIZE`, the calldata, the access list and the authorization entries — MUST be charged before execution as the intrinsic state gas (Two-Pool Gas): the reservoir pays it first and the regular budget its … |
 | [`SATIN-HIST-005`](evm/history-gas.md) | The records of the applied EIP-7702 authorities, and the record the transaction's own frame makes at its start (its value's recipient or its created account), MUST be charged before the first frame. |
 | [`SATIN-HIST-006`](evm/history-gas.md) | A log, a storage write's record, and the records of a `SELFDESTRUCT` (the account it clears and its beneficiary) MUST be charged by the opcode once it completed. |
-| [`SATIN-HIST-007`](evm/history-gas.md) | A part the destruction table takes back MUST be given back into the reservoir of the destroying frame, including when another frame paid it, and a failure of that frame discards the give-back (`SATIN-SD-010`, … |
+| [`SATIN-HIST-007`](evm/history-gas.md) | A part the destruction table takes back is given back to the destroying frame (`SATIN-SD-005`, `SATIN-SD-007`, `SATIN-SD-010`, SELFDESTRUCT and the Destruction Table). |
 | [`SATIN-HIST-008`](evm/history-gas.md) | An opcode that fails after its write was observed — an `SSTORE` or a `SELFDESTRUCT` that cannot pay a regular charge it makes after its load — MUST keep nothing and MUST be charged no history. |
 | [`SATIN-HIST-009`](evm/history-gas.md) | A `CALL`, `CALLCODE`, `CREATE` or `CREATE2` MUST charge its own frame for the records the frame it starts makes — the accounts a value transfer changes from what the transaction loaded; a creation's created account, … |
 | [`SATIN-HIST-010`](evm/history-gas.md) | A value `CALL` to an account empty under EIP-161 MUST charge its caller in this order: |
@@ -134,7 +134,7 @@ Home: [History Gas and the History Allowance](evm/history-gas.md)
 | [`SATIN-HIST-012`](evm/history-gas.md) | Every give-back of state gas or of history gas — a refill (a slot written back, an account returned to what the transaction loaded, a record taken back), the destruction table's, a start's charge given back when the … |
 | [`SATIN-HIST-013`](evm/history-gas.md) | A record an opcode commits — a storage write, a log, a `SELFDESTRUCT`'s records — MUST be held to the limits (Resource Limits) before its history is charged, so a record a limit refuses is not charged. |
 | [`SATIN-HIST-014`](evm/history-gas.md) | At a frame start the order is the reverse of an opcode's: the calling opcode MUST pay for the start's records before the frame starts, and they are then held to the limits, so a caller that cannot pay runs out of gas … |
-| [`SATIN-HIST-015`](evm/history-gas.md) | The opcode MUST charge the records a start makes as the state stands when it runs: a value the caller cannot fund makes no record and is charged no history; a creation whose creator's nonce cannot be bumped, whose … |
+| [`SATIN-HIST-015`](evm/history-gas.md) | The opcode MUST charge the records a start makes as the state stands when it runs: a value the caller cannot fund makes no record and is charged no history; a creation its opcode refuses (`SATIN-HIST-023`) starts no … |
 | [`SATIN-HIST-016`](evm/history-gas.md) | These MUST NOT pay history gas: |
 | [`SATIN-HIST-017`](evm/history-gas.md) | The EIP-7623 floor MUST still be computed and validated for every transaction (Gas Schedule and Intrinsic Gas). |
 | [`SATIN-HIST-018`](evm/history-gas.md) | A value-transferring `CALL` or `CALLCODE` below the transaction's own frame MUST grant the frame it starts a history allowance of `HISTORY_ALLOWANCE_BYTES × COST_PER_HISTORY_BYTE` gas. |
@@ -151,8 +151,8 @@ Home: [Write and Take-Back Patterns](evm/take-backs.md)
 | Id | Rule |
 | --- | --- |
 | [`SATIN-TAKE-001`](evm/take-backs.md) | For every pattern of the tables below, a node MUST charge, give back and count as the pattern's row states, in the order the row states, on each of these: |
-| [`SATIN-TAKE-002`](evm/take-backs.md) | A give-back of state gas or history gas MUST credit the reservoir of the frame that makes it — the frame running the opcode that takes the record or the state back, or the caller of a start when that start returns — and … |
-| [`SATIN-TAKE-003`](evm/take-backs.md) | A give-back of state or history gas MUST NOT be an EIP-3529 refund: it is credited at once, to the frame of `SATIN-TAKE-002`, is not capped, and does not change the refund counter; the refund counter MUST change only by … |
+| [`SATIN-TAKE-002`](evm/take-backs.md) | A give-back of state gas or history gas MUST credit a reservoir, as `SATIN-HIST-012` states, and the reservoir is that of the frame that makes it (`SATIN-HIST-007`): the frame running the opcode that takes the record or … |
+| [`SATIN-TAKE-003`](evm/take-backs.md) | A give-back of state or history gas is not an EIP-3529 refund (`SATIN-HIST-012`): the refund counter MUST change only by the inherited `SSTORE` rules, a frame's changes to it merging into its caller's when it succeeds … |
 | [`SATIN-TAKE-004`](evm/take-backs.md) | Every count a frame makes, a fall and a take-back included, MUST be on that frame's own net: it merges into the caller's net when the frame succeeds and is discarded when it fails, and a record the failed frame took … |
 | [`SATIN-TAKE-005`](evm/take-backs.md) | A storage slot written by `SSTORE` and taken back MUST be accounted as this table states, for a slot of an account that is not marked for deletion (a marked account's slot is the marked row of `SATIN-TAKE-007`), each … |
 | [`SATIN-TAKE-006`](evm/take-backs.md) | An account's nonce, balance or code written and taken back MUST be accounted as this table states, an account's record existing while it differs from what the transaction loaded (`SATIN-ACCT-004`); the sender, whose … |
@@ -197,7 +197,7 @@ Home: [Resource Limits](evm/resource-limits.md)
 | [`SATIN-LIM-012`](evm/resource-limits.md) | A node MUST NOT hold an Oracle hint's bytes, which are counted on the transaction and on no frame, or the authorization list, which is decided before the first frame, to any frame budget. |
 | [`SATIN-LIM-013`](evm/resource-limits.md) | A frame start MUST be held to the limits once it is decided — once the value moved and, for a creation, the creator's nonce was bumped and the created account made — and MUST be held to what the start kept: the write … |
 | [`SATIN-LIM-014`](evm/resource-limits.md) | A start answered with a failure — a precompile that fails after its value moved — kept nothing, its failure taking back the value and the transfer log: it MUST count nothing and MUST NOT be stopped by a limit, and its … |
-| [`SATIN-LIM-015`](evm/resource-limits.md) | A start the caller's account refuses — a value the caller cannot fund, a creation whose creator nonce cannot be bumped — MUST count nothing, MUST make no start record, MUST be charged no history for start records, and … |
+| [`SATIN-LIM-015`](evm/resource-limits.md) | A start the caller's account refuses — a value the caller cannot fund, a creation whose creator nonce cannot be bumped — MUST count nothing, MUST make no start record, and MUST NOT be stopped by a limit for anything … |
 | [`SATIN-LIM-016`](evm/resource-limits.md) | A creation onto an occupied address (SELFDESTRUCT and the Destruction Table) fails on the collision after its creator's nonce was bumped, and MUST NOT be stopped for what its start would count: its failure discards the … |
 | [`SATIN-LIM-017`](evm/resource-limits.md) | The transaction limits of `SATIN-LIM-001`, the frame share of `SATIN-LIM-003`, the detention caps (Gas Detention) and the block's data-size, KV and state-growth limits (Block Limits and Packing) are protocol values of … |
 
@@ -228,7 +228,7 @@ Home: [Resource Accounting](evm/resource-accounting.md)
 | [`SATIN-ACCT-013`](evm/resource-accounting.md) | State growth MUST be the net count of new accounts and new storage slots the transaction keeps: each rise is one unit at an account-leaf or fresh-slot state charge site (State Gas and SALT Pricing), not one unit per … |
 | [`SATIN-ACCT-014`](evm/resource-accounting.md) | The rises MUST be exactly: |
 | [`SATIN-ACCT-015`](evm/resource-accounting.md) | An account that is not empty under EIP-161 MUST NOT be a rise, an authority whose account the state holds MUST NOT be one either, and neither MUST a `CALLCODE`, a value call to the calling account itself, deployed code, … |
-| [`SATIN-ACCT-016`](evm/resource-accounting.md) | An `SSTORE` MUST change state growth by this table alone, whose columns are the slot's original value in the transaction, its present value, and the value written: |
+| [`SATIN-ACCT-016`](evm/resource-accounting.md) | An `SSTORE` MUST change state growth at the transitions of `SATIN-STATE-008` alone, read from the slot's original value in the transaction, its present value and the value written: +1 where that rule charges fresh-slot … |
 | [`SATIN-ACCT-017`](evm/resource-accounting.md) | The fee credits the settlement writes MUST NOT be rises and are not EIP-8037 charge sites. |
 | [`SATIN-ACCT-018`](evm/resource-accounting.md) | A fall MUST happen at the opcode that restores the state, and a fall cannot cross a limit. |
 | [`SATIN-ACCT-019`](evm/resource-accounting.md) | A rise that would take the signed net past the transaction limit or the frame budget is the crossing, and that rise MUST NOT be kept (Limit Stops). |
@@ -245,7 +245,7 @@ Home: [EIP-7702 Authorizations Before the First Frame](evm/authorizations.md)
 | [`SATIN-AUTH-003`](evm/authorizations.md) | Every other entry MUST load its authority's account with its code. |
 | [`SATIN-AUTH-004`](evm/authorizations.md) | The entry's nonce MUST then be compared with the authority's effective nonce: |
 | [`SATIN-AUTH-005`](evm/authorizations.md) | The simulation MUST walk the whole list and MUST NOT stop at the first entry that would cross a limit. |
-| [`SATIN-AUTH-006`](evm/authorizations.md) | A failure to read an authority the simulation consults is a database fault, and the transaction MUST have no outcome: when the node's database declares the error fatal the node MUST report an internal error, and any … |
+| [`SATIN-AUTH-006`](evm/authorizations.md) | A failure to read an authority the simulation consults is a fault of the transaction's execution, reported as `SATIN-VAL-010` classifies it (Transaction Validation and Refusals). |
 | [`SATIN-AUTH-007`](evm/authorizations.md) | The simulation MUST charge no gas, a cold access included; the intrinsic `PER_AUTH_BASE_COST` of every entry is already charged by validation, applied or not (Gas Schedule and Intrinsic Gas). |
 | [`SATIN-AUTH-008`](evm/authorizations.md) | The totals the list would keep, were it applied, MUST be: |
 | [`SATIN-AUTH-009`](evm/authorizations.md) | Delegation-indicator state gas MUST be charged at most once per authority, and only when an accepted authorization writes a non-zero delegation designator, the authority holds no delegation indicator at the start of the … |
@@ -273,7 +273,7 @@ Home: [SELFDESTRUCT and the Destruction Table](evm/selfdestruct.md)
 | [`SATIN-SD-006`](evm/selfdestruct.md) | State growth MUST fall for the absent leaf and for each slot on the zero-then-non-zero row, and for nothing else in the table. |
 | [`SATIN-SD-007`](evm/selfdestruct.md) | A write record the table takes back MUST return its data size to the destroying frame's budget and its history gas into the destroying frame's reservoir, and the KV count falls by that record. |
 | [`SATIN-SD-008`](evm/selfdestruct.md) | Deployed code is neither a write record nor a unit of state growth; code on the absent-then-present row MUST return its data size and its history gas as a record taken back does. |
-| [`SATIN-SD-009`](evm/selfdestruct.md) | The give-back MUST follow the give-back rule of `SATIN-HIST-012`, into the destroying frame's reservoir, and is a give-back of state or history gas, as a slot written back to zero is, not an EIP-3529 refund. |
+| [`SATIN-SD-009`](evm/selfdestruct.md) | The give-back MUST follow the give-back rule of `SATIN-HIST-012`, as a slot written back to zero does. |
 | [`SATIN-SD-010`](evm/selfdestruct.md) | When the destroying frame succeeds, the give-back is reservoir of that frame and returns up the chain with its reservoir (`SATIN-POOL-012`). |
 | [`SATIN-SD-011`](evm/selfdestruct.md) | A later `SELFDESTRUCT` of the same account while the mark stands MUST apply the table for nothing: it subtracts nothing, refills nothing and takes nothing back. |
 | [`SATIN-SD-012`](evm/selfdestruct.md) | A `SELFDESTRUCT` of an account that was not created in the transaction MUST NOT apply the destruction table and MUST NOT mark the account: it subtracts nothing, refills nothing and takes nothing back, and EIP-6780 does … |
@@ -356,20 +356,20 @@ Home: [Halts, Reverts and Stops](evm/outcomes.md)
 | --- | --- |
 | [`SATIN-OUT-001`](evm/outcomes.md) | Every transaction a node is given MUST end in exactly one of these classes: |
 | [`SATIN-OUT-002`](evm/outcomes.md) | Every resource limit and gas detention's compute limit MUST revert only the frame that crosses it, and its caller MAY catch the stop; no limit halts a frame or a transaction. |
-| [`SATIN-OUT-003`](evm/outcomes.md) | Initcode over `MAX_INITCODE_SIZE` and deployed code over `MAX_CONTRACT_SIZE` MUST end as Contract Size Limits specifies — a creation transaction rejected, a creation opcode halting its frame, a creation halting — and a … |
-| [`SATIN-OUT-004`](evm/outcomes.md) | An input over an OP precompile's size limit MUST fail the call as Precompiles specifies (`SATIN-PCMP-005`): a halt of the call, not a stop. |
+| [`SATIN-OUT-003`](evm/outcomes.md) | Initcode over `MAX_INITCODE_SIZE` and deployed code over `MAX_CONTRACT_SIZE` MUST end as Contract Size Limits specifies (`SATIN-SIZE-003`, `SATIN-SIZE-004`): a rejection of a creation transaction, a halt at a creation … |
+| [`SATIN-OUT-004`](evm/outcomes.md) | An input over an OP precompile's size limit MUST fail the call as Precompiles specifies (`SATIN-PCMP-005`): a halt of the call. |
 | [`SATIN-OUT-005`](evm/outcomes.md) | A failed deposit MUST use its whole gas limit and report no stop (Deposit Transactions). |
 | [`SATIN-OUT-006`](evm/outcomes.md) | A charge made before the first frame that the transaction cannot pay MUST end the transaction out of gas without running a frame, as `SATIN-SCHED-009` and `SATIN-SCHED-010` specify (Gas Schedule and Intrinsic Gas): a … |
 | [`SATIN-OUT-007`](evm/outcomes.md) | A real out-of-gas, a precompile given less than its price, an invalid opcode, and every other exceptional halt of the base layer (Base Layer) MUST halt and consume the halting frame's regular gas (`SATIN-POOL-014`). |
-| [`SATIN-OUT-008`](evm/outcomes.md) | A refused volatile read MUST revert its frame with `VolatileDataAccessDisabled(uint8)`, as MegaAccessControl specifies; it is a revert, and not a limit stop. |
-| [`SATIN-OUT-009`](evm/outcomes.md) | A system contract's own refusal (for example `NonZeroTransfer()` or `NotIntercepted()`) MUST revert with its own error and is not a limit stop (Call Interception); a keyless deployment's rule refusal reverts the call … |
+| [`SATIN-OUT-008`](evm/outcomes.md) | A refused volatile read MUST revert its frame with `VolatileDataAccessDisabled(uint8)`, as MegaAccessControl specifies. |
+| [`SATIN-OUT-009`](evm/outcomes.md) | A system contract's own refusal (for example `NonZeroTransfer()` or `NotIntercepted()`) MUST revert with its own error (Call Interception); a keyless deployment's step refuses or halts as `SATIN-KEY-004` states … |
 | [`SATIN-OUT-010`](evm/outcomes.md) | A call past the call-depth limit, or with a value its caller cannot fund, MUST fail with empty return data and count nothing (`SATIN-LIM-015`); it is neither a halt of the caller nor a stop. |
 | [`SATIN-OUT-011`](evm/outcomes.md) | A precompile that fails MUST consume all the gas forwarded to it (Precompiles), and a start answered with that failure is not replaced by a stop (`SATIN-LIM-014`). |
-| [`SATIN-OUT-012`](evm/outcomes.md) | A creation opcode in a static frame, or short of its operands, MUST halt its frame; under gas detention the charges a `CREATE2` makes before it reads its salt can be the crossing, which stops the frame where the stack … |
+| [`SATIN-OUT-012`](evm/outcomes.md) | A creation opcode in a static frame, or short of its operands, MUST halt its frame, unless a charge it makes before the failing check is gas detention's crossing (`SATIN-SIZE-006`). |
 | [`SATIN-OUT-013`](evm/outcomes.md) | A halt of the transaction's own frame ends the transaction as `SATIN-POOL-017` settles it, with a failed receipt; for a deposit it is a failed deposit (`SATIN-DEP-004`, Deposit Transactions). |
 | [`SATIN-OUT-014`](evm/outcomes.md) | A revert of the transaction's own frame ends the transaction with a failed receipt, as `SATIN-POOL-017` settles it, and a limit stop of that frame as `SATIN-STOP-009` settles it; for a deposit either is a revert, not a … |
-| [`SATIN-OUT-015`](evm/outcomes.md) | A failed bucket-capacity read (`SATIN-STATE-007`) or a failed database read MUST NOT be an outcome of the transaction, for a deposit as for any transaction: the transaction MUST NOT be settled, as a failed deposit or … |
-| [`SATIN-OUT-016`](evm/outcomes.md) | A transaction that fails validation MUST report no stop (`SATIN-STOP-003`): a non-deposit is rejected; a deposit, a system deposit refused under Regolith and a deposit whose body is over the data-size limit included, is … |
+| [`SATIN-OUT-015`](evm/outcomes.md) | A failed bucket-capacity read (`SATIN-STATE-007`) or a failed database read MUST NOT be an outcome of the transaction, for a deposit as for any transaction: the transaction is not settled, and the node reports the fault … |
+| [`SATIN-OUT-016`](evm/outcomes.md) | A transaction that fails validation MUST report no stop (`SATIN-STOP-003`): a non-deposit is rejected, a Mega System Transaction that fails its own checks among them, and a deposit is included as a failed deposit … |
 | [`SATIN-OUT-017`](evm/outcomes.md) | What a tracer or inspector is shown of an execution is outside this specification, and a node MAY show it any frames — for a transaction whose first frame cannot pay a charge made before it runs, one halted root frame … |
 | [`SATIN-OUT-018`](evm/outcomes.md) | This specification names no halt reason: a halt is identified only as a halt, and a node MAY label a halt with any reason, which is part of no receipt, state or witness. |
 
@@ -385,7 +385,7 @@ Home: [EIP-7708 Transfer Logs](evm/transfer-logs.md)
 | [`SATIN-LOG-004`](evm/transfer-logs.md) | A deposit's value MUST be logged; its mint MUST NOT be. |
 | [`SATIN-LOG-005`](evm/transfer-logs.md) | A node MUST NOT emit any other log any revision of EIP-7708 defines, a `Burn` log included, and MUST NOT apply EIP-8246: a balance can still be burned, and a burn MUST NOT log. |
 | [`SATIN-LOG-006`](evm/transfer-logs.md) | A transfer log MUST count `TRANSFER_LOG_SIZE` bytes of data size where the value moves — with the start of the frame that moves it, held to the limits with the start's records (`SATIN-LIM-013`), or with the … |
-| [`SATIN-LOG-007`](evm/transfer-logs.md) | A frame start that the caller's account refuses (`SATIN-LIM-015`) moves nothing and MUST log nothing. |
+| [`SATIN-LOG-007`](evm/transfer-logs.md) | A frame start that the caller's account refuses (`SATIN-LIM-015`, `SATIN-HIST-023`), and a creation with an endowment onto an occupied address, which fails on the collision before the endowment moves (`SATIN-LIM-016`), … |
 
 ## Contract Size Limits
 
@@ -409,7 +409,7 @@ Home: [Precompiles](evm/precompiles.md)
 | [`SATIN-PCMP-001`](evm/precompiles.md) | The precompile set MUST be Optimism Karst's, with KZG point evaluation (`0x0A`) at a fixed `KZG_POINT_EVALUATION_GAS`: |
 | [`SATIN-PCMP-002`](evm/precompiles.md) | ModExp (`0x05`) MUST run on the Osaka schedule: EIP-7823's bound of `MODEXP_MAX_INPUT_SIZE` bytes on each of its three lengths, and EIP-7883's pricing with its minimum of `MODEXP_MIN_GAS`. |
 | [`SATIN-PCMP-003`](evm/precompiles.md) | `P256VERIFY` (`0x100`) MUST cost `P256VERIFY_GAS` (EIP-7951). |
-| [`SATIN-PCMP-004`](evm/precompiles.md) | The OP precompiles' input size limits MUST be: BN254 pairing (`0x08`) `BN254_PAIRING_MAX_INPUT_SIZE` bytes; BLS12-381 G1 MSM (`0x0C`) `BLS12_G1_MSM_MAX_INPUT_SIZE`; G2 MSM (`0x0E`) `BLS12_G2_MSM_MAX_INPUT_SIZE`; pairing … |
+| [`SATIN-PCMP-004`](evm/precompiles.md) | The OP precompiles' input size limits MUST be those the table of `SATIN-PCMP-001` gives BN254 pairing (`0x08`) and BLS12-381 G1 MSM (`0x0C`), G2 MSM (`0x0E`) and pairing (`0x0F`). |
 | [`SATIN-PCMP-005`](evm/precompiles.md) | An input over one of those size limits MUST fail the call before any gas check, as the Optimism specification of the limit has it, a call forwarded no gas included, and MUST consume all the gas forwarded to it, as every … |
 | [`SATIN-PCMP-006`](evm/precompiles.md) | A KZG point evaluation call given less than `KZG_POINT_EVALUATION_GAS` MUST fail out of gas before any verification runs; a successful call MUST be charged exactly `KZG_POINT_EVALUATION_GAS`; and a call given at least … |
 | [`SATIN-PCMP-007`](evm/precompiles.md) | ModExp MUST charge and check its input in this order: its `MODEXP_MIN_GAS` minimum, a call that cannot pay it failing before the lengths are read; then the rest of its formula price; then EIP-7823's bound, an input over … |
@@ -434,7 +434,7 @@ Home: [Call Interception](system-contracts/interception.md)
 | --- | --- |
 | [`SATIN-ICPT-001`](system-contracts/interception.md) | A node MUST answer a call itself, before a frame is built for it, when and only when the call is a `CALL` or a `STATICCALL`, its target is a system contract that has an interceptor, and the first four bytes of its input … |
 | [`SATIN-ICPT-002`](system-contracts/interception.md) | A call whose frame would be deeper than `CALL_STACK_LIMIT` MUST NOT reach any interceptor, nor the `keylessDeploy` recognition. |
-| [`SATIN-ICPT-003`](system-contracts/interception.md) | An intercepted method of MegaAccessControl or MegaLimitControl called with a non-zero value MUST be answered with a revert whose data is `NonZeroTransfer()`, before any value moves and whether or not the caller can fund … |
+| [`SATIN-ICPT-003`](system-contracts/interception.md) | An intercepted method of MegaAccessControl or MegaLimitControl called with a non-zero value MUST be answered with a revert whose data is `NonZeroTransfer()`, before any value moves and before the funds check … |
 | [`SATIN-ICPT-004`](system-contracts/interception.md) | An interceptor's answer MUST return to the caller as the result of a frame that ran on the child's regular gas, the forward plus a value call's `CALL_STIPEND` (`SATIN-FWD-003`): the call opcode's regular charges, made … |
 | [`SATIN-ICPT-005`](system-contracts/interception.md) | Under gas detention, an answer whose regular spend exceeds the calling frame's allowance — state and history gas that regular gas paid not counted — MUST be the crossing: the answer's whole regular spend is treated as … |
 | [`SATIN-ICPT-006`](system-contracts/interception.md) | A `keylessDeploy(bytes,uint256)` call MUST be recognized by its depth (0, the transaction's own frame), its scheme (`CALL`), its target (`KEYLESS_DEPLOY_ADDRESS`), its selector, and its arguments, whatever code the … |
@@ -491,7 +491,7 @@ Home: [KeylessDeploy](system-contracts/keyless-deploy.md)
 | [`SATIN-KEY-014`](system-contracts/keyless-deploy.md) | Unless a limit stopped it (`SATIN-KEY-016`), the call MUST succeed and return `(gasUsed, deployedAddress, errorData)`: |
 | [`SATIN-KEY-015`](system-contracts/keyless-deploy.md) | `gasUsed` MUST be what the creation spent from both pools taken together, without intrinsic gas and before the EIP-3529 refund: the regular gas and the reservoir the creation was given, less the regular gas and the … |
 | [`SATIN-KEY-016`](system-contracts/keyless-deploy.md) | A limit the creation crosses — its frame budget in data size, KV updates or state growth, the transaction's limit in one of those dimensions, or gas detention's compute limit, at the creation's start or in its initcode … |
-| [`SATIN-KEY-017`](system-contracts/keyless-deploy.md) | The node MUST NOT produce the errors `ParentBudgetExceeded(uint8,uint64,uint64)`, `InvalidTransaction()`, `InsufficientComputeGas(uint64,uint64)` or `InternalError()`, which the interface no longer declares: a database … |
+| [`SATIN-KEY-017`](system-contracts/keyless-deploy.md) | The node MUST NOT produce the errors `ParentBudgetExceeded(uint8,uint64,uint64)`, `InvalidTransaction()`, `InsufficientComputeGas(uint64,uint64)` or `InternalError()`, which the interface no longer declares: a read the … |
 | [`SATIN-KEY-018`](system-contracts/keyless-deploy.md) | A call that carries value MUST first be held to gas detention for step 1's charge: when that charge is the crossing, the call is stopped with `MegaLimitExceeded(2, limit)` and none of it is billed; otherwise the charge … |
 
 ## MegaAccessControl

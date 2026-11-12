@@ -54,7 +54,7 @@ Beyond the base layer's checks, a transaction can carry a body too large for the
 
 - `SATIN-VAL-008` A deposit MUST NOT be rejected for failing a validation check: a deposit that fails any check of this page, or of the base layer, MUST be included as a failed deposit instead (see [Deposit Transactions](deposits.md)).
   A Mega System Transaction is a legacy transaction until it has passed its own chain-id, nonce and EIP-3607 checks, so failing one of those is a rejection; once it has passed them it runs as a deposit, and a check it fails after that includes it as a failed deposit.
-  A read the node fails to make — a database read, a bucket-capacity read — is not a validation check, for a deposit as for any transaction: the transaction gets no outcome, as [Halts, Reverts and Stops](../evm/outcomes.md) specifies, and the node reports it as `SATIN-VAL-010` classifies it.
+  A read the node fails to make is not a validation check, for a deposit as for any transaction: it is a fault (`SATIN-VAL-010`).
 - `SATIN-VAL-010` A read a node fails to make for a transaction MUST be reported by its cause, and the transaction MUST NOT be settled, as a failed deposit or otherwise:
   - a failed bucket-capacity read, always as an internal error of the node (`SATIN-STATE-007`);
   - a failed database read the transaction's execution makes — in its validation, a Mega System Transaction's sender checks and the L1 block contract's account and slots its fee computation reads (`SATIN-WIT-011`) among them, in a frame, in the authorization list's simulation or application, or in a charge made before the first frame — as an internal error when the node's database declares the error fatal, and otherwise as an invalid block, as for a pre-block call (`SATIN-PBLK-006`);
@@ -62,7 +62,7 @@ Beyond the base layer's checks, a transaction can carry a body too large for the
 
   A node that meets such a failure reaches no verdict on the block except the invalid block of the second case, and cannot execute the block past that transaction.
 
-### Retired rule ids
+### Retired ids
 
 - `SATIN-VAL-009` Retired, removed: what a transaction pool can decide without state is node documentation, outside the specification.
 

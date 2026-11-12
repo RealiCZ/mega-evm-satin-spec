@@ -27,7 +27,6 @@ A deposit that cannot be executed must still be recorded, and the record must sa
 - `SATIN-DEP-002` That a deposit which is not system-originated is priced by the SALT bucket its state lands in, held to every per-transaction limit and frame budget, and detained after a read of volatile data, as any transaction is, is the rule of `SATIN-STATE-009`, `SATIN-LIM-001` and `SATIN-DET-026`; which deposits are system-originated is `SATIN-MST-010` (see [Mega System Transactions](../system-contracts/system-tx.md)).
 - `SATIN-DEP-003` A deposit — or a Mega System Transaction, which executes as one — whose caller is empty under EIP-161 when the deposit is executed (no account, or nonce zero, zero balance and no code: `SATIN-STATE-011`) MUST be charged that account's new-account state gas exactly once, before its first frame, as the first charge of `SATIN-SCHED-008`, priced at the caller's bucket (at `m = 1` for a system-originated one).
   The account MUST always be created and kept, whatever the deposit then does, and it MUST count as one unit of state growth; being one account, it cannot by itself cross the state-growth limit.
-  A caller whose leaf the state holds but which is empty under EIP-161 is charged and counted as one the state holds no account for; the witness still answers it as a leaf (`SATIN-WIT-017`).
 - `SATIN-DEP-009` That a deposit pays nothing for its gas, and that where the [EIP-7623](https://eips.ethereum.org/EIPS/eip-7623) floor binds its gas used only its receipt's gas used and the block's figures move, is the rule `SATIN-HIST-017` (see [History Gas](../evm/history-gas.md)).
 - `SATIN-DEP-007` That a deposit whose own frame succeeds, reverts or is stopped by a limit settles as an ordinary transaction, a stop being a revert and not a failed deposit, is the rule `SATIN-STOP-010` with `SATIN-OUT-014` (see [Halts, Reverts and Stops](../evm/outcomes.md)).
 - `SATIN-DEP-010` A deposit that creates a contract from a sender whose nonce is `MAX_NONCE`, which cannot be bumped, and whose balance, its mint credited, funds the deposit's value, MUST succeed with nothing created and nothing counted for the creation: no account at the address the creation would derive, no state gas for it, no record and no state growth, the gas of its first frame untouched.
@@ -49,8 +48,6 @@ A deposit that cannot be executed must still be recorded, and the record must sa
 
 - `SATIN-DEP-011` A state in which a deposit's sender's balance plus the deposit's mint exceeds `MAX_BALANCE` when the deposit is executed is an invalid prestate: the execution of such a deposit, whether it would succeed or fail, lies outside this specification.
 - `SATIN-DEP-013` A deposit has no gas price: an envelope that presents itself as a deposit and carries a gas price is malformed, and its execution lies outside this specification.
-
-A value transfer a deposit makes — its value, or a `CALL`'s, a `SELFDESTRUCT`'s or a creation's within it — that would push its recipient's balance above `MAX_BALANCE` lies outside this specification as any transaction's does (see [Base Layer](../base-layer.md), `SATIN-BASE-011`).
 
 ## Constants
 

@@ -28,7 +28,7 @@ A read the building node does not report is missing from the witness, and the va
   - the hash of every block `BLOCKHASH` read during the block's execution (`SATIN-WIT-014`);
   - the capacity of every SALT bucket the block's execution exports (`SATIN-WIT-013`).
 
-  It holds no answer of the oracle service: a system call, a deposit or a Mega System Transaction is given no value by the service (`SATIN-ORCL-005`), and every value the service gave a read of another transaction the block includes is in the Oracle's slot at that read, written before the transaction by a Mega System Transaction of the block, or, a value the transaction's own writes explain, by the transaction itself earlier in it (see [Oracle](../system-contracts/oracle.md), `SATIN-ORCL-012`, `SATIN-ORCL-013`).
+  It holds no answer of the oracle service: every value an Oracle read of the block pushes is in the Oracle's slot at that read (see [Oracle](../system-contracts/oracle.md), `SATIN-ORCL-005`, `SATIN-ORCL-012`, `SATIN-ORCL-013`).
 - `SATIN-WIT-002` A transaction MUST load every account and slot its execution reads from the state: in its validation, in its fee settlement, and in any of its frames — a frame that reverted, halted or was stopped, and a frame of a deposit that failed, included.
   A failed frame's writes are taken back, not its reads; a failed deposit takes back everything but its sender's nonce bump and mint, not its reads.
 - `SATIN-WIT-003` The L1 block information a transaction is priced against, and the data-availability footprint gas scalar every non-deposit transaction reads before it runs, are read outside the transaction's journal, and every account and slot such a read makes MUST be reported with the transaction that made it (`SATIN-WIT-011`).
@@ -82,7 +82,7 @@ A read the building node does not report is missing from the witness, and the va
 
 - `SATIN-WIT-016` A block replayed on exactly its witness MUST produce the same receipts, state changes, gas ledgers, logs and block counters as the block's execution, and MUST read nothing the witness does not hold.
   Its exports MUST be a subset of the building node's, and MAY be a proper one: the building node's also hold the buckets and block hashes that candidates it executed and dropped asked for.
-  A validator runs no oracle service: it reads every Oracle value from the slot (`SATIN-ORCL-012`), and hints, which reach the service alone, are not in the witness.
+  A validator reads every Oracle value from the slot (`SATIN-ORCL-012`), and hints, which reach the service alone, are not in the witness.
 
 ### Retired ids
 

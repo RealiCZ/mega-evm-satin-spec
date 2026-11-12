@@ -53,7 +53,7 @@ If the budget of a pre-block call depended on the block's gas limit, or its stat
   A database error in the factory check, in a deployment, in the due-change read or in the resolution of the live system address is always an internal error of the node: a node whose database cannot serve them cannot execute the block, whatever its transactions.
   A registry the deployment cannot migrate (`SATIN-REG-008`), and one the resolution finds absent, holding other code or naming no system address (`SATIN-REG-004`), MUST make the block invalid.
 
-### Retired rule ids
+### Retired ids
 
 - `SATIN-PBLK-005` Retired, merged into `SATIN-ORCL-005` (see [Oracle](../system-contracts/oracle.md)): an Oracle read during a system call asks no oracle service.
 

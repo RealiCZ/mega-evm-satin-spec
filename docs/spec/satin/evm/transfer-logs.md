@@ -27,8 +27,7 @@ ERC-20 transfers carry a `Transfer` event that indexers already read; value tran
 - `SATIN-LOG-005` A node MUST NOT emit any other log any revision of EIP-7708 defines, a `Burn` log included, and MUST NOT apply [EIP-8246](https://eips.ethereum.org/EIPS/eip-8246): a balance can still be burned, and a burn MUST NOT log.
   Two burns remain, both silent: a `SELFDESTRUCT` to itself of an account created in the same transaction burns the balance at once, and an account destroyed in the transaction is removed at its end with whatever balance it then holds, a value it received after its destruction included, whose `CALL` logged the transfer ([SELFDESTRUCT and the Destruction Table](selfdestruct.md)).
 - `SATIN-LOG-006` A transfer log MUST count `TRANSFER_LOG_SIZE` bytes of data size where the value moves — with the start of the frame that moves it, held to the limits with the start's records (`SATIN-LIM-013`), or with the `SELFDESTRUCT` that moves it — and MUST NOT be a write record, MUST NOT pay history gas, and MUST NOT draw on a history allowance ([History Gas and the History Allowance](history-gas.md)).
-- `SATIN-LOG-007` A frame start that the caller's account refuses (`SATIN-LIM-015`) moves nothing and MUST log nothing.
-  A creation with an endowment onto an occupied address moves nothing and MUST log nothing: the collision fails it before the endowment moves, and nothing of the log is counted or held to a limit (`SATIN-LIM-016`).
+- `SATIN-LOG-007` A frame start that the caller's account refuses (`SATIN-LIM-015`, `SATIN-HIST-023`), and a creation with an endowment onto an occupied address, which fails on the collision before the endowment moves (`SATIN-LIM-016`), move nothing and MUST log nothing.
 
 ### Retired ids
 

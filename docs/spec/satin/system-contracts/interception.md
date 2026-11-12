@@ -46,30 +46,18 @@ KeylessDeploy has none either: its `keylessDeploy` call is recognized by the rul
   5. nothing more is required: the `bytes` need no padding to a whole word, the offset need not be the canonical 64 and may point into the head, trailing bytes after the encoding are allowed, and the head's second word, `gasLimitOverride`, may hold any value.
 
   A call with the selector whose arguments the decoder refuses is not recognized: the node charges it nothing, and it runs KeylessDeploy's bytecode, as every other call to KeylessDeploy does; the bytecode's decoder refuses the same arguments, so the call reverts with empty data.
-
-The table below is informative: each input is the selector followed by the words and bytes shown, `word(x)` being `x` as a 32-byte big-endian word and `gas` any `gasLimitOverride`, sent by a transaction's own `CALL` without value.
-
-| Arguments after the selector | Recognized | What follows |
-| ---------------------------- | ---------- | ------------ |
-| `word(0x40)`, `word(gas)`, `word(5)`, 5 bytes: the tail padding cut | Recognized | The deployment's steps run, step 3 reading the 5 bytes |
-| `word(0x20)`, `word(3)`, 3 bytes: the offset points at the second head word, which is read as the length | Recognized | The first argument is the 3 bytes, and `gasLimitOverride` is 3 |
-| `word(0)`, `word(gas)`: offset zero, so the first head word is read as the length, and the `bytes` are empty | Recognized | Step 1 charges the overhead, and step 3 refuses the empty argument with `MalformedEncoding()` |
-| The first input one byte short of its declared length: `word(0x40)`, `word(gas)`, `word(5)`, 4 bytes | Not recognized | KeylessDeploy's bytecode runs and reverts with empty data; the node charges nothing |
+  The conditions are pinned by the conformance cases `satin/keyless/recognition/unpadded-bytes`, `satin/keyless/recognition/offset-into-head`, `satin/keyless/recognition/offset-zero` and `satin/keyless/recognition/one-byte-short`.
 
 ### The call-depth gate
 
 - `SATIN-ICPT-002` A call whose frame would be deeper than `CALL_STACK_LIMIT` MUST NOT reach any interceptor, nor the `keylessDeploy` recognition.
-  It MUST be answered as any call past the call-stack limit is, with the depth failure: the child's regular gas, a value call's `CALL_STIPEND` included (`SATIN-FWD-003`), and its reservoir share MUST return to the caller whole, the records' history and a new account's state gas the opcode charged for the start MUST be given back into the caller's reservoir (`SATIN-HIST-023`, `SATIN-POOL-015`), and no interceptor effect is made and no hint forwarded or counted.
+  It MUST be answered as any call past the call-stack limit is, with the depth failure, which returns and gives back to the caller what `SATIN-HIST-023` states for a start that does not happen; no interceptor effect is made and no hint forwarded or counted.
   The depth gate comes before every other decision about the call, a limit included: a call past the depth limit counts no start toward any limit and cannot be stopped by one.
 
 ### The order of a call's decisions
 
 - `SATIN-ICPT-007` Once the call opcode has made every charge of its own (its regular charges, a new account's state gas, the forward, and the history of the records its start would make as the state stands, steps 1 to 4 of `SATIN-HIST-010`), as the principle of `SATIN-HIST-023` orders it, a `CALL` or `STATICCALL` MUST be decided in this order: first the depth gate (`SATIN-ICPT-002`); then interception, which is every interceptor's answer, its value policy included (`SATIN-ICPT-003`), the admission of a `sendHint` and the data-size check of its input ([Oracle](oracle.md)), and the `keylessDeploy` recognition (`SATIN-ICPT-006`) with steps 1 and 2 of the deployment ([KeylessDeploy](keyless-deploy.md)); and only then the frame start, where the caller's funds are checked and the value moves ([Resource Limits](../evm/resource-limits.md), `SATIN-LIM-013`, `SATIN-LIM-015`).
-  Interception therefore comes before the funds check, and whether the caller can fund the call's value changes nothing interception does:
-  - a `sendHint` carrying a value its caller cannot fund is admitted, forwarded and counted as any hint is, and then its frame start refuses the call for the value, which fails with empty return data (`SATIN-OUT-010`), the hint staying counted;
-  - a `sendHint` whose input would take the transaction over its data-size limit is answered `MegaLimitExceeded(0, limit)`, nothing forwarded or counted (`SATIN-ORCL-010`), whether or not its caller can fund its value;
-  - an intercepted method of MegaAccessControl or MegaLimitControl called with value is answered `NonZeroTransfer()` (`SATIN-ICPT-003`), whether or not its caller can fund the value;
-  - a recognized `keylessDeploy` call carrying value is charged step 1's overhead and answered `NoEtherTransfer()` (`SATIN-KEY-018`), whether or not its caller can fund the value.
+  Interception therefore comes before the funds check, and whether the caller can fund the call's value changes nothing interception does: not the admission of a `sendHint` or the data-size stop of its input (`SATIN-ORCL-006`, `SATIN-ORCL-010`), not the value policy's `NonZeroTransfer()` (`SATIN-ICPT-003`), and not steps 1 and 2 of a recognized `keylessDeploy` call (`SATIN-KEY-018`).
 
   The charges come before all three decisions, so a caller that cannot pay one of them halts out of gas before the depth gate: no answer is made and no hint is admitted.
   A value call its caller can fund that interception answers or stops was charged the history of the records its transfer would make, and MUST be given it back into the caller's reservoir when the answer returns (`SATIN-HIST-023`); a value its caller cannot fund makes no record, so nothing was charged for it and nothing is given back (`SATIN-HIST-015`).
@@ -77,9 +65,9 @@ The table below is informative: each input is the selector followed by the words
 
 ### The value policy
 
-- `SATIN-ICPT-003` An intercepted method of MegaAccessControl or MegaLimitControl called with a non-zero value MUST be answered with a revert whose data is `NonZeroTransfer()`, before any value moves and whether or not the caller can fund the value (`SATIN-ICPT-007`); the method's own answer is not made.
+- `SATIN-ICPT-003` An intercepted method of MegaAccessControl or MegaLimitControl called with a non-zero value MUST be answered with a revert whose data is `NonZeroTransfer()`, before any value moves and before the funds check (`SATIN-ICPT-007`); the method's own answer is not made.
   The policy applies once the selector matched: a call carrying value to a selector the contract does not intercept runs the bytecode.
-  A `sendHint` carrying value is admitted as any hint is, and then runs the Oracle's bytecode, or, when its caller cannot fund the value, fails at its frame start, the hint counted all the same (see [Oracle](oracle.md)).
+  A `sendHint` carrying value is not answered by this policy: it is admitted as any hint is (`SATIN-ORCL-006`).
 
 ### The answer
 

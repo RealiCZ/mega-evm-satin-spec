@@ -38,7 +38,7 @@ Which authorities a list would create or change depends on the state — whether
 - `SATIN-AUTH-005` The simulation MUST walk the whole list and MUST NOT stop at the first entry that would cross a limit.
   Each distinct authority whose entry passed the chain-id, nonce and signature gates of `SATIN-AUTH-002` MUST be loaded once, and a later entry for that authority MUST use the simulated nonce and the code already loaded.
   Every authority so loaded is in the block's witness, whether or not the list is applied ([The Stateless Witness](../block/stateless-witness.md)).
-- `SATIN-AUTH-006` A failure to read an authority the simulation consults is a database fault, and the transaction MUST have no outcome: when the node's database declares the error fatal the node MUST report an internal error, and any other database error MUST make the block invalid ([Halts, Reverts and Stops](outcomes.md)).
+- `SATIN-AUTH-006` A failure to read an authority the simulation consults is a fault of the transaction's execution, reported as `SATIN-VAL-010` classifies it ([Transaction Validation and Refusals](../block/transaction-validation.md)).
   The block MUST NOT be refused for the limit instead, also when an earlier prefix of the list would already have crossed.
 - `SATIN-AUTH-007` The simulation MUST charge no gas, a cold access included; the intrinsic `PER_AUTH_BASE_COST` of every entry is already charged by validation, applied or not ([Gas Schedule and Intrinsic Gas](gas-schedule.md)).
 

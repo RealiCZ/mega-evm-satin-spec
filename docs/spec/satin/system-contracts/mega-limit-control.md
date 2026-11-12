@@ -30,7 +30,7 @@ interface IMegaLimitControl {
 }
 ```
 
-  `remainingComputeGas()` is intercepted for a `CALL` or a `STATICCALL`, under the rules of [Call Interception](interception.md), a value-bearing call answered with `NonZeroTransfer()`; a `DELEGATECALL` or `CALLCODE`, and any other selector, run the bytecode, whose fallback reverts with `NotIntercepted()`.
+  `remainingComputeGas()` is intercepted for a `CALL` or a `STATICCALL`, under the rules of [Call Interception](interception.md), its value policy included (`SATIN-ICPT-003`); a `DELEGATECALL` or `CALLCODE`, and any other selector, run the bytecode, whose fallback reverts with `NotIntercepted()`.
 - `SATIN-MLC-002` `remainingComputeGas()` MUST return, ABI-encoded as a `uint64`, `remaining = min(own, allowance)`, read when the call reaches the interceptor, where:
   - `own` is the calling frame's own regular gas after the call deducted its forward, plus the gas the call forwarded, counted back;
   - `allowance` is, once a read of volatile data set a compute limit for the transaction, what that limit leaves the transaction at the start of the call's frame (`limit − compute`, zero once the compute is past the limit; see [Gas Detention](../evm/gas-detention.md)), and is absent, leaving `remaining = own`, while no limit is set.
