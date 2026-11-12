@@ -89,12 +89,15 @@ A charge that depends on state cannot be made correctly before the state is read
   1. for a deposit, a Mega System Transaction executed as one included, whose caller is empty under EIP-161: the new-account state gas of that account, exactly once (`SATIN-DEP-003`, [Deposit Transactions](../block/deposits.md));
   2. for each authorization the list applies, in list order ([EIP-7702 Authorizations Before the First Frame](authorizations.md)): the new-account state gas of an authority the state holds no account for, then `ACCOUNT_WRITE` for the authority's first write, then the delegation indicator's state gas at most once per authority;
   3. the history gas of the write records made outside every frame: the applied authorities' records and the record of the first frame's start ([History Gas and the History Allowance](history-gas.md));
-  4. the new-account state gas of the transaction's recipient, when its value goes to a recipient empty under EIP-161, or of its created account, when the created address is empty under EIP-161.
+  4. the new-account state gas of the transaction's recipient, when its value goes to a recipient empty under EIP-161, or of its created account, when the created address is empty under EIP-161;
+  5. for a call whose recipient holds an EIP-7702 delegation indicator: the delegate's access, in regular gas, `WARM_STORAGE_READ_COST` first and then, when the delegate is not warm, the additional cold account access of `SATIN-SCHED-003`, `COLD_ACCOUNT_ACCESS − WARM_STORAGE_READ_COST`.
 
+  In general, every charge the base layer makes before the first frame stands, at the place and in the order the base layer gives it, unless a rule of the Satin section changes it (`SATIN-BASE-001`); step 5 is one of them, the access EIP-2780 charges for the code a delegated recipient runs.
+  The delegate MUST be loaded at step 5 and at no earlier step, once `WARM_STORAGE_READ_COST` is paid, and the load makes it warm; a delegate that is not warm MUST be loaded only when the regular gas then left can pay the additional cold access, and a transaction that cannot pay it runs out of gas with the delegate not loaded (`SATIN-SCHED-009`).
   `ACCOUNT_WRITE` MUST NOT be charged for an authority whose account write the transaction has already paid: the sender, whose write validation pays in `TX_BASE_COST`; the recipient of a transaction that carries a non-zero value, whose write `TX_VALUE_COST` pays; and an authority an earlier applied authorization of the list already wrote.
   The load made for the first frame's start — of the recipient, or of the created address — MUST be made at step 4 and at no earlier step, so a transaction that cannot pay a charge of steps 1 to 3 makes no load for that start.
   An account the transaction loads earlier in another role — the sender at validation, an authority by the list's simulation and application (`SATIN-AUTH-003`, `SATIN-AUTH-005`) — is loaded all the same, and stays in the transaction's read set when it is also the recipient ([The Stateless Witness](../block/stateless-witness.md)).
-- `SATIN-SCHED-009` A transaction that cannot pay a charge of `SATIN-SCHED-008` — the account a deposit creates for its caller, an authorization's charges, the history of the records made outside a frame, or the charge for the first frame's start — MUST run out of gas without running a frame.
+- `SATIN-SCHED-009` A transaction that cannot pay a charge of `SATIN-SCHED-008` — the account a deposit creates for its caller, an authorization's charges, the history of the records made outside a frame, the charge for the first frame's start, or a delegated recipient's delegate access — MUST run out of gas without running a frame.
   An authorization list the KV or state-growth limit skips is charged nothing ([EIP-7702 Authorizations Before the First Frame](authorizations.md)), and this path does not apply to it.
 - `SATIN-SCHED-010` On that path everything applied before the first frame MUST be taken back, except what validation did to the sender's account (its fee and a call's nonce bump) and the account a deposit created for its caller: the applied EIP-7702 authorizations with their nonce and delegation writes, the sender's own authorization included, their state gas and their write records.
   The intrinsic gas and the body's history gas MUST stay charged, the rest of the regular budget MUST be consumed, and the reservoir left MUST return to the sender; the sender of a creation keeps the nonce bump the creation would have made.
@@ -148,6 +151,12 @@ Every other entry is Amsterdam's, so an Ethereum tool that prices Amsterdam pric
 **Why charge an authority's state at the start of execution?**
 Whether an authority exists, and whether it already holds a delegation indicator, is a property of the state, which validation without state cannot read.
 EIP-2780 therefore charges the state-independent part of an authorization (7,816) at validation and the rest when the list is applied; Satin keeps that split, and refunds nothing for an existing authority because nothing was charged for it.
+
+**Why is a delegated recipient's delegate access charged before the first frame?**
+The first frame of a call to a delegated account runs the delegate's code, so the delegate is read before that frame starts, and EIP-2780 prices the read as any account access is priced: the warm cost, and the cold addition for a delegate the transaction has not made warm.
+Both are regular gas of the transaction and no frame's, like the other charges of `SATIN-SCHED-008`.
+The warm cost is paid before the load and the cold addition after it, and a delegate that is not warm is read only when the addition can be paid, so a transaction that runs out of gas here has not read an account it could not pay for.
+Rex6, on Prague's schedule, read the delegate without a charge.
 
 **Why are preload-warm addresses warm on their first touch?**
 Rex6 charged a cold access on the first `CALL`-family or `SELFDESTRUCT`-beneficiary touch of a precompile, the beneficiary or an access-list address, a MegaETH addition on Ethereum's warm set.

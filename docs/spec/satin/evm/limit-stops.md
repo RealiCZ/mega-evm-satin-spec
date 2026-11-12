@@ -58,7 +58,7 @@ A transaction therefore never keeps more data size, KV updates or state growth t
 ### Enforcement before a frame runs
 
 - `SATIN-STOP-013` A frame whose start crosses a limit (`SATIN-LIM-013`) MUST be stopped before it runs an instruction, and what its start moved MUST be reverted with it: the value, the transfer log, a created account.
-- `SATIN-STOP-014` A frame answered with a success without running — a call to an account with no code, a precompile that answers — whose start crosses MUST have its answer replaced by the stop, on the gas its caller forwarded, untouched.
+- `SATIN-STOP-014` A frame answered with a success without running — a call to an account with no code, a precompile that answers — whose start crosses MUST have its answer replaced by the stop, on the child's whole regular gas, untouched: the forward and, for a value call, the `CALL_STIPEND` (`SATIN-FWD-003`, `SATIN-POOL-012`).
   A frame answered with a failure kept nothing, and its answer MUST NOT be replaced by a stop: a precompile that fails consumes the gas forwarded to it, as without a limit.
   A precompile whose price crosses gas detention moves nothing, and MUST be held to the price alone: its result is the compute stop, whatever records its value transfer would have made (`SATIN-DET-022`).
 - `SATIN-STOP-015` A stopped creation MUST keep its creator's nonce bump, and that write's record MUST be counted on the creator when the creation returns: the creator MUST be held to its limits with it before it runs on, and be stopped if it crosses one (`SATIN-LIM-008`).
@@ -98,6 +98,7 @@ None.
 | `KIND_KV_UPDATES`          | 1                                             | Kind of a KV-update stop                                     |
 | `KIND_COMPUTE`             | 2                                             | Kind of a gas-detention stop                                 |
 | `KIND_STATE_GROWTH`        | 3                                             | Kind of a state-growth stop                                  |
+| `CALL_STIPEND`             | 2,300                                         | Stipend a value-transferring `CALL` or `CALLCODE` adds to the child ([Gas Forwarding](gas-forwarding.md)) |
 
 ## Rationale
 

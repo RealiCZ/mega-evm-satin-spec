@@ -78,6 +78,10 @@ A transaction that read volatile data therefore runs exactly as it would without
 
 - `SATIN-DET-018` A regular charge that the spendable part cannot pay but the frame's whole regular gas can is the crossing: the charge MUST NOT be made, the frame's gas MUST be put back to what it was before the charge, and the frame MUST be stopped with `MegaLimitExceeded(2, limit)` ([Limit Stops](limit-stops.md)).
   What the frame spent before the crossing charge stays spent, and its caller MUST get back everything the frame had, the withheld part included.
+  In general, each part an inherited opcode deducts from regular gas MUST be one charge, held to the spendable part where the opcode deducts it, in the opcode's order: its static cost (`SATIN-SCHED-002`), then each dynamic part it deducts on its own, as the base layer has them (`SATIN-BASE-001`).
+  The first part the spendable part cannot pay decides, against the regular gas the frame holds at that part: it is the crossing when the frame's whole regular gas can pay it and an out-of-gas when it cannot (`SATIN-DET-020`), whatever the parts after it would cost.
+  The charges stated as one are the exceptions: an Oracle read's cold access (`SATIN-ORCL-004`) and an interceptor's answer (`SATIN-DET-025`).
+  A `BALANCE` of an account that is not warm, in a frame with 50 of spendable gas and 1,000 of regular gas in all, is stopped at its static cost of `WARM_STORAGE_READ_COST`, which the 1,000 can pay; it does not run out of gas on the 3,000 the access costs in all.
 - `SATIN-DET-019` At the crossing the transaction's compute is at most the limit and less than the crossing charge short of it; a caller the stop returns into MUST resume held to what the limit leaves the transaction, so any regular charge of its own past that is a crossing too.
   What a halting frame burns adds nothing to compute, while its paid work before the halt still counts, so no halt takes the transaction's compute past the limit: the compute since a read is at most its cap.
 - `SATIN-DET-020` A regular charge beyond the frame's whole regular gas, and every other out-of-gas, MUST halt as it would without the read.
@@ -140,6 +144,12 @@ Rex6 treated it as volatile because its volatile set carried the opcode over wit
 **Why does a read whose opcode fails mark nothing, but an Oracle read stand?**
 Rex6 registered a read of the beneficiary's account by `BALANCE`, `EXTCODESIZE`, `EXTCODEHASH`, `EXTCODECOPY` or `SELFDESTRUCT` before charging its access, so a frame that then ran out of gas left the registration standing; Satin marks such a read only once its opcode completed, because the read did not happen: the opcode halts before it loads the account, and the replay skips the same load ([The Stateless Witness](../block/stateless-witness.md)).
 The Oracle read keeps Rex6's order: it is made — the slot loaded, and the service asked where the read asks it — before its charge, so the read did happen, and its mark stands with it.
+
+**Why is each part of an opcode's cost a charge of its own?**
+The inherited opcodes take their cost in parts: a static cost before the opcode runs, then memory, a value transfer or a cold access as the opcode reaches them.
+Detention holds each of those parts where it is taken, so it needs no second pricing of an opcode's total, and a detained frame is stopped at the first part it may not spend.
+Summing the parts first would turn that stop into an out-of-gas whenever the total exceeds the frame's gas, though the part that crossed did not.
+The Oracle's read and an interceptor's answer are single charges because their rules make them so, each for a reason of its own ([Oracle](../system-contracts/oracle.md), `SATIN-DET-025`).
 
 **Why are creations not reads?**
 A creation loads its creator to check balance and nonce and its created address to decide the created account's state gas, as a value call checks its caller's balance; neither is a read of the beneficiary's state that another transaction conflicts on, and Rex6 neither marked nor refused a creation.
