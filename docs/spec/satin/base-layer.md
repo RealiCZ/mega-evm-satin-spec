@@ -49,7 +49,7 @@ The rules of this page apply to every block from Satin's activation on (see [Act
 - `SATIN-BASE-007` A fork MUST be taken to activate in a block when the chain configuration schedules it, it is active at the block's timestamp, and it is not active at the parent block's timestamp.
   A fork the chain configuration does not schedule MUST NOT be taken to activate in any block.
 - `SATIN-BASE-008` A Mega System Transaction is a legacy transaction, so a block that admits only deposits MUST NOT contain one either.
-  The block in which Satin activates therefore carries no Mega System Transaction; and since it holds only deposits, for which the node asks the oracle service nothing (see [Oracle](system-contracts/oracle.md), `SATIN-ORCL-005`), no read of that block is served, and every Oracle read in it pushes the slot's value on the chain.
+  The block in which Satin activates therefore carries no Mega System Transaction, and no Oracle read in it asks the oracle service (see [Oracle](system-contracts/oracle.md), `SATIN-ORCL-005`).
   A deposit can still write the Oracle in that block through code running at the live system address, as the Oracle's bytecode allows (`SATIN-ORCL-011`).
 
 ### The data-availability footprint

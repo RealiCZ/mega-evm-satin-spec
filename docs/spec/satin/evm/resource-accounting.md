@@ -66,28 +66,13 @@ Counting state growth without its falls stops a transaction that creates and rem
 
   Each is decided by the predicates of `SATIN-STATE-011`: an authority by existence — the state holds no account at its address — and every other site by EIP-161 emptiness — no account, or nonce zero, zero balance and no code.
 - `SATIN-ACCT-015` An account that is not empty under EIP-161 MUST NOT be a rise, an authority whose account the state holds MUST NOT be one either, and neither MUST a `CALLCODE`, a value call to the calling account itself, deployed code, or a delegation indicator.
-  An account whose leaf is in the state but is empty under EIP-161 is the exception to existence at every site of `SATIN-ACCT-014` but an authority: there it MUST be a rise as an absent account is, although the witness answers it as a leaf (`SATIN-WIT-017`); as an applied authorization's authority it is not a rise.
-- `SATIN-ACCT-016` An `SSTORE` MUST change state growth by this table alone, whose columns are the slot's original value in the transaction, its present value, and the value written:
-
-  | Original | Present  | New      | State growth |
-  | -------- | -------- | -------- | ------------ |
-  | zero     | zero     | zero     | none         |
-  | zero     | zero     | non-zero | +1           |
-  | zero     | non-zero | zero     | −1           |
-  | zero     | non-zero | non-zero | none         |
-  | non-zero | zero     | zero     | none         |
-  | non-zero | zero     | non-zero | none         |
-  | non-zero | non-zero | zero     | none         |
-  | non-zero | non-zero | non-zero | none         |
-
-  The transitions are those of the fresh-slot state charge and give-back (`SATIN-STATE-008`).
-  A no-op writes the present value and changes nothing.
+  An account whose leaf is in the state but is empty under EIP-161 is a rise or not by the predicate of its site (`SATIN-STATE-011`).
+- `SATIN-ACCT-016` An `SSTORE` MUST change state growth at the transitions of `SATIN-STATE-008` alone, read from the slot's original value in the transaction, its present value and the value written: +1 where that rule charges fresh-slot state gas (original zero, present zero, new non-zero), −1 where it gives it back (original zero, present non-zero, new zero), and nothing on every other transition.
   A slot written from zero to a non-zero value and then to another non-zero value rose once; written from zero to non-zero and back to zero, its net is zero; written from zero to non-zero, back to zero and to non-zero again, it rose, fell and rose.
-  A slot whose original value is not zero changes nothing on any transition.
   While its account is marked for deletion, an `SSTORE` of its slots changes nothing ([SELFDESTRUCT and the Destruction Table](selfdestruct.md)).
 - `SATIN-ACCT-017` The fee credits the settlement writes MUST NOT be rises and are not EIP-8037 charge sites.
 - `SATIN-ACCT-018` A fall MUST happen at the opcode that restores the state, and a fall cannot cross a limit.
-  The only slot fall is the table's row of original zero, present non-zero and new zero; the other falls are the destruction table's ([SELFDESTRUCT and the Destruction Table](selfdestruct.md)).
+  The only slot fall is the −1 transition of `SATIN-ACCT-016`; the other falls are the destruction table's ([SELFDESTRUCT and the Destruction Table](selfdestruct.md)).
 - `SATIN-ACCT-019` A rise that would take the signed net past the transaction limit or the frame budget is the crossing, and that rise MUST NOT be kept ([Limit Stops](limit-stops.md)).
 - `SATIN-ACCT-020` A failed deposit whose caller was empty under EIP-161 when the deposit was executed MUST count that account as one unit of state growth on the transaction's reported usage and on the block's counter, MUST NOT be charged state gas for it, and MUST NOT be stopped by the limit, the deposit having already failed ([Deposit Transactions](../block/deposits.md)).
   A deposit that runs to a success or a revert and creates its caller makes the ordinary charged rise of one, and a stop of its first frame keeps that account ([Limit Stops](limit-stops.md)).

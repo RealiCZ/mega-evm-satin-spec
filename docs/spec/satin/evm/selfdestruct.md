@@ -44,7 +44,7 @@ If it is given back carelessly, a destruction can give back what another transac
   | Slot          | non-zero                   | any      | Nothing of the refill or the fall; the write record of a slot the transaction loaded stands, and the deletion makes it when that slot still holds its original value; a slot the transaction did not load has no record |
 
   Every part is deleted with the account.
-- `SATIN-SD-005` A refill MUST be the price that part was charged — its schedule entry times the bucket multiplier of that charge ([State Gas and SALT Pricing](state-gas.md)), its legacy share included — and MUST go into the reservoir of the destroying frame, never its regular gas, also when another frame paid it (`SATIN-HIST-012`).
+- `SATIN-SD-005` A refill MUST be the price that part was charged — its schedule entry times the bucket multiplier of that charge ([State Gas and SALT Pricing](state-gas.md)), its legacy share included — and MUST go into the reservoir of the destroying frame, also when another frame paid it (`SATIN-HIST-012`).
   On the absent-leaf row the leaf's charge is the one this transaction made for that leaf: at the value transfer that funded the address, at a `SELFDESTRUCT` that paid it, at the transaction's own value, or at the creation when the created address was empty.
 - `SATIN-SD-006` State growth MUST fall for the absent leaf and for each slot on the zero-then-non-zero row, and for nothing else in the table.
   The fall of the absent leaf stands also when the creation itself added no rise, as when the transaction funded the address and then created onto it.
@@ -52,7 +52,7 @@ If it is given back carelessly, a destruction can give back what another transac
 - `SATIN-SD-007` A write record the table takes back MUST return its data size to the destroying frame's budget and its history gas into the destroying frame's reservoir, and the KV count falls by that record.
   When the destroying frame is the transaction's own frame and that frame succeeds, this return is the record's history gas once, and the settlement MUST NOT give that charge back again (`SATIN-HIST-005`).
 - `SATIN-SD-008` Deployed code is neither a write record nor a unit of state growth; code on the absent-then-present row MUST return its data size and its history gas as a record taken back does.
-- `SATIN-SD-009` The give-back MUST follow the give-back rule of `SATIN-HIST-012`, into the destroying frame's reservoir, and is a give-back of state or history gas, as a slot written back to zero is, not an EIP-3529 refund.
+- `SATIN-SD-009` The give-back MUST follow the give-back rule of `SATIN-HIST-012`, as a slot written back to zero does.
   It MUST be credited with the completed write, after every charge the opcode makes: a charge the frame cannot pay halts the opcode first, and the give-back is not credited.
   It MUST NOT raise the destroying frame's remaining in any dimension above the budget the frame was given (`SATIN-LIM-004`).
 - `SATIN-SD-010` When the destroying frame succeeds, the give-back is reservoir of that frame and returns up the chain with its reservoir (`SATIN-POOL-012`).

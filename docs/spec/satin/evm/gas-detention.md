@@ -88,7 +88,7 @@ A transaction that read volatile data therefore runs exactly as it would without
 
 ### Precompiles
 
-- `SATIN-DET-021` A call to a precompile MUST make its own regular charges first, as any opcode's — its static cost, its memory and the value transfer; every precompile of the set is warm from the transaction's start (`SATIN-SCHED-012`), so the call makes no cold access — and one that crosses MUST stop the calling frame before the price is consulted and before anything moves, whether or not the caller can fund the value (`SATIN-LIM-010`).
+- `SATIN-DET-021` A call to a precompile MUST make its own regular charges first, as any opcode's — its static cost, its memory and the value transfer; every precompile of the set is warm from the transaction's start (`SATIN-SCHED-012`), so the call makes no cold access — and one that crosses MUST stop the calling frame before the price is consulted and before anything moves (`SATIN-LIM-010`), the opcode's charges coming before every decision about the start (`SATIN-HIST-023`).
   A call to a precompile forwarded more regular gas than the frame's allowance — what the limit leaves the transaction at the call — MUST then be decided from the precompile's price, read before it runs, for the precompile and input of the called address (`SATIN-PCMP-008`):
   - priced within the allowance, it runs on its whole forward;
   - priced past the allowance and within its forward, it MUST NOT run and is the crossing;

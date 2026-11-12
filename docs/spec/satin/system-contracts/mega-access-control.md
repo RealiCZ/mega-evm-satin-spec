@@ -53,7 +53,7 @@ interface IMegaAccessControl {
 }
 ```
 
-  All three methods are intercepted for a `CALL` or a `STATICCALL`, under the rules of [Call Interception](interception.md), a value-bearing call answered with `NonZeroTransfer()`; a `DELEGATECALL` or `CALLCODE`, and any other selector, run the bytecode, whose fallback reverts with `NotIntercepted()`.
+  All three methods are intercepted for a `CALL` or a `STATICCALL`, under the rules of [Call Interception](interception.md), its value policy included (`SATIN-ICPT-003`); a `DELEGATECALL` or `CALLCODE`, and any other selector, run the bytecode, whose fallback reverts with `NotIntercepted()`.
   The methods change only an execution-local switch, the same under `CALL` and `STATICCALL`: they write no account or storage, emit no log and move no value.
   The switch is held per transaction, for the frame that made the call — the caller, one level above the frame the call would start:
   - `disableVolatileDataAccess()` switches volatile-data access off for the caller's frame and every frame below it; a switch already off from a frame above the caller stays as it is.

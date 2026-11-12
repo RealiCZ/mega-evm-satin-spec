@@ -38,28 +38,28 @@ An implementer needs one place that names every class of ending and every except
 
 These endings enforce a size, a payment or a protocol rule, and none of them is a limit stop:
 
-- `SATIN-OUT-003` Initcode over `MAX_INITCODE_SIZE` and deployed code over `MAX_CONTRACT_SIZE` MUST end as [Contract Size Limits](contract-limits.md) specifies — a creation transaction rejected, a creation opcode halting its frame, a creation halting — and a keyless deployment's initcode over the limit is refused by its own rule ([KeylessDeploy](../system-contracts/keyless-deploy.md)).
-- `SATIN-OUT-004` An input over an OP precompile's size limit MUST fail the call as [Precompiles](precompiles.md) specifies (`SATIN-PCMP-005`): a halt of the call, not a stop.
+- `SATIN-OUT-003` Initcode over `MAX_INITCODE_SIZE` and deployed code over `MAX_CONTRACT_SIZE` MUST end as [Contract Size Limits](contract-limits.md) specifies (`SATIN-SIZE-003`, `SATIN-SIZE-004`): a rejection of a creation transaction, a halt at a creation opcode or of a creation, a refusal of a keyless deployment.
+- `SATIN-OUT-004` An input over an OP precompile's size limit MUST fail the call as [Precompiles](precompiles.md) specifies (`SATIN-PCMP-005`): a halt of the call.
 - `SATIN-OUT-005` A failed deposit MUST use its whole gas limit and report no stop ([Deposit Transactions](../block/deposits.md)).
 - `SATIN-OUT-006` A charge made before the first frame that the transaction cannot pay MUST end the transaction out of gas without running a frame, as `SATIN-SCHED-009` and `SATIN-SCHED-010` specify ([Gas Schedule and Intrinsic Gas](gas-schedule.md)): a non-deposit is included out of gas, and a deposit becomes a failed deposit.
 - `SATIN-OUT-007` A real out-of-gas, a precompile given less than its price, an invalid opcode, and every other exceptional halt of the base layer ([Base Layer](../base-layer.md)) MUST halt and consume the halting frame's regular gas (`SATIN-POOL-014`).
-  Under gas detention a regular charge beyond the frame's whole regular gas halts as without the read (`SATIN-DET-020`), and a creation that cannot pay a code-deposit charge runs out of gas and leaves no code (`SATIN-SCHED-011`).
-- `SATIN-OUT-008` A refused volatile read MUST revert its frame with `VolatileDataAccessDisabled(uint8)`, as [MegaAccessControl](../system-contracts/mega-access-control.md) specifies; it is a revert, and not a limit stop.
-- `SATIN-OUT-009` A system contract's own refusal (for example `NonZeroTransfer()` or `NotIntercepted()`) MUST revert with its own error and is not a limit stop ([Call Interception](../system-contracts/interception.md)); a keyless deployment's rule refusal reverts the call and an out-of-gas step halts it, as [KeylessDeploy](../system-contracts/keyless-deploy.md) specifies.
-- `SATIN-OUT-010` A call past the call-depth limit, or with a value its caller cannot fund, MUST fail with empty return data and count nothing (`SATIN-LIM-015`); it is neither a halt of the caller nor a stop.
-  The exception is a call that interception answers or admits first, since interception comes before the funds check ([Call Interception](../system-contracts/interception.md), `SATIN-ICPT-007`): an interceptor answers the call whether or not its caller can fund the value — with `NonZeroTransfer()`, a keyless deployment's `NoEtherTransfer()` after its overhead, or a `sendHint`'s data-size stop — and a `sendHint` admitted before its value is refused keeps its input counted, the call then failing with empty return data.
+  So do a regular charge beyond the frame's whole regular gas under gas detention (`SATIN-DET-020`) and a code-deposit charge a creation cannot pay (`SATIN-SCHED-011`).
+- `SATIN-OUT-008` A refused volatile read MUST revert its frame with `VolatileDataAccessDisabled(uint8)`, as [MegaAccessControl](../system-contracts/mega-access-control.md) specifies.
+- `SATIN-OUT-009` A system contract's own refusal (for example `NonZeroTransfer()` or `NotIntercepted()`) MUST revert with its own error ([Call Interception](../system-contracts/interception.md)); a keyless deployment's step refuses or halts as `SATIN-KEY-004` states ([KeylessDeploy](../system-contracts/keyless-deploy.md)).
+- `SATIN-OUT-010` A call refused at the depth gate, or at its frame start for a value its caller cannot fund, MUST fail with empty return data and count nothing for the refused start (`SATIN-LIM-015`); it is neither a halt of the caller nor a stop.
+  Interception's answers, stops and admissions keep their own results and counts (`SATIN-ICPT-007`, `SATIN-ORCL-006`).
 - `SATIN-OUT-011` A precompile that fails MUST consume all the gas forwarded to it ([Precompiles](precompiles.md)), and a start answered with that failure is not replaced by a stop (`SATIN-LIM-014`).
-- `SATIN-OUT-012` A creation opcode in a static frame, or short of its operands, MUST halt its frame; under gas detention the charges a `CREATE2` makes before it reads its salt can be the crossing, which stops the frame where the stack underflow would have halted it (`SATIN-SIZE-006`).
+- `SATIN-OUT-012` A creation opcode in a static frame, or short of its operands, MUST halt its frame, unless a charge it makes before the failing check is gas detention's crossing (`SATIN-SIZE-006`).
 
 ### How the transaction's own frame ends
 
 - `SATIN-OUT-013` A halt of the transaction's own frame ends the transaction as `SATIN-POOL-017` settles it, with a failed receipt; for a deposit it is a failed deposit (`SATIN-DEP-004`, [Deposit Transactions](../block/deposits.md)).
 - `SATIN-OUT-014` A revert of the transaction's own frame ends the transaction with a failed receipt, as `SATIN-POOL-017` settles it, and a limit stop of that frame as `SATIN-STOP-009` settles it; for a deposit either is a revert, not a failed deposit (`SATIN-STOP-010`).
-- `SATIN-OUT-016` A transaction that fails validation MUST report no stop (`SATIN-STOP-003`): a non-deposit is rejected; a deposit, a system deposit refused under Regolith and a deposit whose body is over the data-size limit included, is included as a failed deposit; and a Mega System Transaction is a legacy transaction until it passes its own checks, so failing one of them is a rejection ([Mega System Transactions and the Protocol's Own Transactions](../system-contracts/system-tx.md)).
+- `SATIN-OUT-016` A transaction that fails validation MUST report no stop (`SATIN-STOP-003`): a non-deposit is rejected, a Mega System Transaction that fails its own checks among them, and a deposit is included as a failed deposit (`SATIN-VAL-008`, `SATIN-DEP-004`).
 
 ### Faults
 
-- `SATIN-OUT-015` A failed bucket-capacity read (`SATIN-STATE-007`) or a failed database read MUST NOT be an outcome of the transaction, for a deposit as for any transaction: the transaction MUST NOT be settled, as a failed deposit or otherwise, and the node MUST report an internal error or an invalid block by the error's cause, as `SATIN-VAL-010` ([Transaction Validation and Refusals](../block/transaction-validation.md)) classifies it.
+- `SATIN-OUT-015` A failed bucket-capacity read (`SATIN-STATE-007`) or a failed database read MUST NOT be an outcome of the transaction, for a deposit as for any transaction: the transaction is not settled, and the node reports the fault as `SATIN-VAL-010` classifies it ([Transaction Validation and Refusals](../block/transaction-validation.md)).
 
 ### Outside the specification
 
