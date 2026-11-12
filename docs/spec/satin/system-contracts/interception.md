@@ -46,7 +46,6 @@ KeylessDeploy has none either: its `keylessDeploy` call is recognized by the rul
   5. nothing more is required: the `bytes` need no padding to a whole word, the offset need not be the canonical 64 and may point into the head, trailing bytes after the encoding are allowed, and the head's second word, `gasLimitOverride`, may hold any value.
 
   A call with the selector whose arguments the decoder refuses is not recognized: the node charges it nothing, and it runs KeylessDeploy's bytecode, as every other call to KeylessDeploy does; the bytecode's decoder refuses the same arguments, so the call reverts with empty data.
-  The conditions are pinned by the conformance cases `satin/keyless/recognition/unpadded-bytes`, `satin/keyless/recognition/offset-into-head`, `satin/keyless/recognition/offset-zero` and `satin/keyless/recognition/one-byte-short`.
 
 ### The call-depth gate
 
