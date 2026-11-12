@@ -46,8 +46,8 @@ These endings enforce a size, a payment or a protocol rule, and none of them is 
   So do a regular charge beyond the frame's whole regular gas under gas detention (`SATIN-DET-020`) and a code-deposit charge a creation cannot pay (`SATIN-SCHED-011`).
 - `SATIN-OUT-008` A refused volatile read MUST revert its frame with `VolatileDataAccessDisabled(uint8)`, as [MegaAccessControl](../system-contracts/mega-access-control.md) specifies.
 - `SATIN-OUT-009` A system contract's own refusal (for example `NonZeroTransfer()` or `NotIntercepted()`) MUST revert with its own error ([Call Interception](../system-contracts/interception.md)); a keyless deployment's step refuses or halts as `SATIN-KEY-004` states ([KeylessDeploy](../system-contracts/keyless-deploy.md)).
-- `SATIN-OUT-010` A call refused at the depth gate, or at its frame start for a value its caller cannot fund, MUST fail with empty return data and count nothing for the refused start (`SATIN-LIM-015`); it is not a halt of the caller.
-  Interception's answers, stops and admissions come first and keep their own results and counts (`SATIN-ICPT-007`, `SATIN-ORCL-006`).
+- `SATIN-OUT-010` A call refused at the depth gate, or at its frame start for a value its caller cannot fund, MUST fail with empty return data and count nothing for the refused start (`SATIN-LIM-015`); it is neither a halt of the caller nor a stop.
+  Interception's answers, stops and admissions keep their own results and counts (`SATIN-ICPT-007`, `SATIN-ORCL-006`).
 - `SATIN-OUT-011` A precompile that fails MUST consume all the gas forwarded to it ([Precompiles](precompiles.md)), and a start answered with that failure is not replaced by a stop (`SATIN-LIM-014`).
 - `SATIN-OUT-012` A creation opcode in a static frame, or short of its operands, MUST halt its frame, unless a charge it makes before the failing check is gas detention's crossing (`SATIN-SIZE-006`).
 
