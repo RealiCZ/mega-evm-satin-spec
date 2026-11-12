@@ -51,6 +51,7 @@ A value transfer that triggers a `receive()` hook must also be able to emit an e
   A list the KV or state-growth limit skips has no authority records, and that history is not charged ([EIP-7702 Authorizations Before the First Frame](authorizations.md)).
   The authorities' records are the transaction's own: their history MUST be kept when the first frame fails or is stopped.
   The first frame's record is that frame's: its history gas MUST come back, into the transaction's reservoir, when that frame reverts or is stopped; when that frame halts, the part the reservoir paid MUST return to the reservoir and the part regular gas paid MUST be consumed with the frame's regular gas.
+  Of the two, the reservoir MUST pay the authorities' records first and the first frame's record with what they leave it, the regular budget paying the rest (`SATIN-POOL-024`): the part of the first frame's record the reservoir paid is the reservoir left after the authorities' records, up to the record's price.
   When the destruction table takes that record back inside a first frame that then succeeds, the charge has already come back with the table, and the settlement MUST NOT give it back a second time; when that first frame then fails, the table's give-back is discarded with the table, and the settlement MUST give the charge back once.
   A transaction that runs out of gas before its first frame keeps neither ([Gas Schedule and Intrinsic Gas](gas-schedule.md)).
 - `SATIN-HIST-006` A log, a storage write's record, and the records of a `SELFDESTRUCT` (the account it clears and its beneficiary) MUST be charged by the opcode once it completed.
@@ -63,11 +64,20 @@ A value transfer that triggers a `receive()` hook must also be able to emit an e
   A `LOG` observes its write after every regular charge of the inherited opcode, so only the limits and its history charge can fail it after its write was observed.
 - `SATIN-HIST-013` A record an opcode commits — a storage write, a log, a `SELFDESTRUCT`'s records — MUST be held to the limits ([Resource Limits](resource-limits.md)) before its history is charged, so a record a limit refuses is not charged.
   A frame that cannot pay that history charge MUST halt out of gas, keeping neither the record nor its bytes.
+- `SATIN-HIST-023` The order around a frame start follows one principle, which the rules it cites apply case by case: the opcode charges first, the start is decided next, and a start that does not happen gives back what was charged for it.
+  A `CALL`, `CALLCODE`, `DELEGATECALL`, `STATICCALL`, `CREATE` or `CREATE2` MUST make every charge of its own in the opcode, before any decision about the start: its regular charges, a new or created account's state gas, the forward, and the history of the records its start would make as the state stands (`SATIN-HIST-009`, `SATIN-HIST-010`, `SATIN-HIST-011`, `SATIN-HIST-015`).
+  Only then MUST the start be decided: a call by the depth gate, then by interception, then by the frame start with its funds check, in the order of `SATIN-ICPT-007` ([Call Interception](../system-contracts/interception.md)); a creation by its frame start, the creation opcode having refused, before it charged anything for the start, a creation whose creator's nonce cannot be bumped, whose endowment the creator cannot fund, or which is past the call-depth limit (`SATIN-HIST-015`).
+  No charge is skipped for a decision that would follow it: a frame that cannot pay one of these charges MUST halt out of gas at it, or be stopped at it when it is gas detention's crossing (`SATIN-DET-018`), and none of the decisions is then made: no interceptor answers, no hint is admitted or forwarded, and no frame starts.
+  A value call its caller can fund whose start does not happen (a call an interceptor answers, a `sendHint` its data-size check stops, a call refused past the call-depth limit) MUST be given back the history the opcode charged for its records, into the caller's reservoir when the call returns (`SATIN-HIST-012`), as a start that a failed or stopped child discards is (`SATIN-HIST-014`).
+  The principle keeps `SATIN-HIST-015`: a value its caller cannot fund makes no record as the state stands, so the opcode charges no history for it and nothing is given back, whether the call is then answered, stopped or refused at its frame start; a new account's state gas charged before a refusal is given back by `SATIN-POOL-015`.
+  The opcode's regular charges MUST stay spent, and every start that does not happen, a call refused for a value its caller cannot fund included, MUST return the child's whole regular gas, a value call's `CALL_STIPEND` included, less only what an interceptor's answer itself charges, together with the child's reservoir share (`SATIN-FWD-003`, `SATIN-POOL-012`, `SATIN-ICPT-004`).
+  The transaction's own frame follows the same principle, the charges made before the first frame standing in the opcode's place (`SATIN-SCHED-008`, `SATIN-HIST-005`).
 - `SATIN-HIST-009` A `CALL`, `CALLCODE`, `CREATE` or `CREATE2` MUST charge its own frame for the records the frame it starts makes — the accounts a value transfer changes from what the transaction loaded; a creation's created account, unless the transaction changed it already, and the creator's nonce record when the bump changes the creator's account from what the transaction loaded ([Resource Accounting](resource-accounting.md)) — after the regular gas it forwards is computed, so the forward is not reduced by them.
-  A caller that cannot pay MUST halt out of gas, and the frame MUST NOT start.
+  A caller that cannot pay MUST halt out of gas: the frame MUST NOT start, and none of the start's decisions is made (`SATIN-HIST-023`).
   The price of a record the start takes back — an account the transfer returns to what the transaction loaded — MUST be given back to the caller once the frame returned with its start kept.
 - `SATIN-HIST-014` At a frame start the order is the reverse of an opcode's: the calling opcode MUST pay for the start's records before the frame starts, and they are then held to the limits, so a caller that cannot pay runs out of gas first; the charge for a start a limit stops MUST be given back when the stopped frame returns.
 - `SATIN-HIST-015` The opcode MUST charge the records a start makes as the state stands when it runs: a value the caller cannot fund makes no record and is charged no history; a creation whose creator's nonce cannot be bumped, whose endowment the creator cannot fund, or which is past the call-depth limit starts no frame and is charged no history and no state gas, the creation opcode refusing it before it charges for the start and before it reads the created address.
+  The opcode reads the state and no decision that follows its charges (`SATIN-HIST-023`): a value call its caller can fund that is past the call-depth limit, or that interception answers or stops, MUST be charged the records its transfer would make, and MUST be given their history back into the caller's reservoir when the call returns.
   The refusal takes back none of the opcode's regular charges made before it — a call's static cost, memory, value-transfer cost and cold access, a creation's static cost, initcode cost and memory — and a regular charge that crosses gas detention stops the frame before the refusal is reached ([Gas Detention](gas-detention.md)).
   A value `CALL` to an account empty under EIP-161 that its caller cannot fund, or that is past the call-depth limit, MUST still charge the new account's state gas, its legacy share included, at step 2 of `SATIN-HIST-010`, before the refusal, and that charge MUST be given back into the caller's reservoir when the call returns refused (`SATIN-POOL-015`); a caller that cannot pay it runs out of gas.
 - `SATIN-HIST-010` A value `CALL` to an account empty under EIP-161 MUST charge its caller in this order:
@@ -139,6 +149,7 @@ None.
 | `LOG_BASE_SIZE`            | 32    | Bytes of a log before its topics and data                                          |
 | `LOG_TOPIC_SIZE`           | 32    | Bytes per log topic                                                                |
 | `HISTORY_ALLOWANCE_BYTES`  | 160   | History bytes a value call's frame may log without paying: 14,080 gas              |
+| `CALL_STIPEND`             | 2,300 | Stipend a value-transferring `CALL` or `CALLCODE` adds to the child ([Gas Forwarding](gas-forwarding.md)) |
 
 ## Rationale
 
@@ -149,6 +160,14 @@ At 88 gas per byte, the history gas of a byte is above the floor's 64 gas per ca
 **Why write records rather than KV updates?**
 A write record is one account or slot a transaction keeps changed, which is what the state diff a node stores and serves carries.
 Pricing each kept record at its 40 bytes ties the price to what the block holds: a slot written back to its original value, or an account returned to what was loaded, leaves nothing to carry and gets its price back.
+
+**Why does the opcode charge for a start before the start is decided?**
+An opcode pays up front in the base layer: a call's access, its value transfer and its forward are taken before the call is dispatched, and a call that is then refused for its depth or its funds returns its gas, the stipend included.
+Satin's own charges for a start, a new account's state gas and the records' history, follow the same order (`SATIN-HIST-023`), so the opcode never has to ask whether an interceptor will answer the call before it charges, and one order covers every start: a frame that runs, a call an interceptor answers, a refusal, a stop.
+Deciding first would leave an answered value call uncharged for its records, and it would make each call opcode repeat interception's test of the target and the selector.
+The order is visible to a contract in two places.
+A charge that is given back lands in the reservoir (`SATIN-HIST-012`), so after a funded value call an interceptor answers the caller's `GAS` is lower by 3,520 for each record the transfer would have made; and a caller left with too little gas after its forward to pay for those records runs out of gas at the opcode, with no answer made and no hint admitted.
+Conformance cases pin both.
 
 **Why does a give-back go to the frame that makes it, and not to the frame that paid?**
 A give-back is made by an opcode, and only the frame running that opcode is there to receive it: the frame that paid may be suspended above, or may have returned already, and crediting it would mean reaching into another frame's gas while a different frame runs.
@@ -164,6 +183,11 @@ A contract that records a failure after a failed call only when it holds more ga
 The sender's account and the four fee credits are written by the settlement, after the result is final, where a charge could no longer change the outcome.
 Charging their five records up front, in the body, bounds them before execution and keeps every charge where it can still be refused.
 
+**Why does the reservoir pay the authorities' records before the first frame's record?**
+The two are charged together before the first frame and settle differently: the authorities' history is kept whatever the first frame does, while a halt of the first frame returns only the part of its start record the reservoir paid.
+A reservoir too small for both therefore has to be counted against one of them first, and the choice decides up to 3,520 gas of what a halted transaction returns to its sender.
+The authorities' records come first because the list is applied first (`SATIN-SCHED-008`).
+
 **Why does the history allowance replace the storage gas stipend?**
 Rex6 granted a value call's callee 23,000 gas of storage-gas allowance, drawn by every storage-gas surcharge.
 Under Satin new state is paid from the reservoir, which a callee always receives a share of, so only history is left for an allowance to cover; 160 bytes is one three-topic event with one word of data, what a `receive()` hook reached through the 2,300-gas stipend needs to log a transfer.
@@ -175,6 +199,7 @@ A pre-block system call appends no transaction to the history and is the protoco
 ## Security Considerations
 
 - If a node charged a record's history after a limit refused it, a stopped frame would pay for bytes the block does not keep; if it held the record to the limits after charging, a frame could be charged for a write that never happens.
+- If a node decided a start before it charged for it, answering a funded value call to an intercepted method without the records' history, the caller's `GAS` after the call would differ from every other node's by 3,520 for each record, and a caller unable to pay that charge would be answered, or have its hint forwarded to the oracle service, where every other node halts it before any decision.
 - If a give-back credited regular gas, a frame's `GAS` would rise by state and history gas the frame or another frame had spent: a slot cleared after a failed call, or an intermediary's revert, would hand back to the running frame regular gas that a contract checking its gas after a failed call assumes is gone; and a frame could turn reservoir it was given into regular gas, and compute past the regular budget its caller forwarded.
 - If a node credited a give-back to the frame that paid instead of the frame that makes it, the reservoirs of the frames would differ from every other node's while they run, and so would whether a later state or history charge fits in a frame's reservoir or spills onto its regular gas.
 - If a failed frame kept a give-back it received, a callee could take back a record its caller paid for, collect the gas and revert, leaving the record standing and the gas spent twice.

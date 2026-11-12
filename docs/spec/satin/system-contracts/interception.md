@@ -59,18 +59,20 @@ The table below is informative: each input is the selector followed by the words
 ### The call-depth gate
 
 - `SATIN-ICPT-002` A call whose frame would be deeper than `CALL_STACK_LIMIT` MUST NOT reach any interceptor, nor the `keylessDeploy` recognition.
-  It MUST be answered as any call past the call-stack limit is, with the depth failure, its forwarded gas and its reservoir share returned to the caller whole, no interceptor effect made and no hint forwarded or counted.
+  It MUST be answered as any call past the call-stack limit is, with the depth failure: the child's regular gas, a value call's `CALL_STIPEND` included (`SATIN-FWD-003`), and its reservoir share MUST return to the caller whole, the records' history and a new account's state gas the opcode charged for the start MUST be given back into the caller's reservoir (`SATIN-HIST-023`, `SATIN-POOL-015`), and no interceptor effect is made and no hint forwarded or counted.
   The depth gate comes before every other decision about the call, a limit included: a call past the depth limit counts no start toward any limit and cannot be stopped by one.
 
 ### The order of a call's decisions
 
-- `SATIN-ICPT-007` Once the call opcode's own charges are made (`SATIN-ICPT-004`), a `CALL` or `STATICCALL` MUST be decided in this order: first the depth gate (`SATIN-ICPT-002`); then interception, which is every interceptor's answer, its value policy included (`SATIN-ICPT-003`), the admission of a `sendHint` and the data-size check of its input ([Oracle](oracle.md)), and the `keylessDeploy` recognition (`SATIN-ICPT-006`) with steps 1 and 2 of the deployment ([KeylessDeploy](keyless-deploy.md)); and only then the frame start, where the caller's funds are checked and the value moves ([Resource Limits](../evm/resource-limits.md), `SATIN-LIM-013`, `SATIN-LIM-015`).
+- `SATIN-ICPT-007` Once the call opcode has made every charge of its own (its regular charges, a new account's state gas, the forward, and the history of the records its start would make as the state stands, steps 1 to 4 of `SATIN-HIST-010`), as the principle of `SATIN-HIST-023` orders it, a `CALL` or `STATICCALL` MUST be decided in this order: first the depth gate (`SATIN-ICPT-002`); then interception, which is every interceptor's answer, its value policy included (`SATIN-ICPT-003`), the admission of a `sendHint` and the data-size check of its input ([Oracle](oracle.md)), and the `keylessDeploy` recognition (`SATIN-ICPT-006`) with steps 1 and 2 of the deployment ([KeylessDeploy](keyless-deploy.md)); and only then the frame start, where the caller's funds are checked and the value moves ([Resource Limits](../evm/resource-limits.md), `SATIN-LIM-013`, `SATIN-LIM-015`).
   Interception therefore comes before the funds check, and whether the caller can fund the call's value changes nothing interception does:
   - a `sendHint` carrying a value its caller cannot fund is admitted, forwarded and counted as any hint is, and then its frame start refuses the call for the value, which fails with empty return data (`SATIN-OUT-010`), the hint staying counted;
   - a `sendHint` whose input would take the transaction over its data-size limit is answered `MegaLimitExceeded(0, limit)`, nothing forwarded or counted (`SATIN-ORCL-010`), whether or not its caller can fund its value;
   - an intercepted method of MegaAccessControl or MegaLimitControl called with value is answered `NonZeroTransfer()` (`SATIN-ICPT-003`), whether or not its caller can fund the value;
   - a recognized `keylessDeploy` call carrying value is charged step 1's overhead and answered `NoEtherTransfer()` (`SATIN-KEY-018`), whether or not its caller can fund the value.
 
+  The charges come before all three decisions, so a caller that cannot pay one of them halts out of gas before the depth gate: no answer is made and no hint is admitted.
+  A value call its caller can fund that interception answers or stops was charged the history of the records its transfer would make, and MUST be given it back into the caller's reservoir when the answer returns (`SATIN-HIST-023`); a value its caller cannot fund makes no record, so nothing was charged for it and nothing is given back (`SATIN-HIST-015`).
   A transaction's own frame that its authorization list stops before it runs (`SATIN-AUTH-010`) is stopped before any of these, and reaches no interceptor.
 
 ### The value policy
@@ -81,7 +83,7 @@ The table below is informative: each input is the selector followed by the words
 
 ### The answer
 
-- `SATIN-ICPT-004` An interceptor's answer MUST return to the caller as the result of a frame that ran on the gas the call forwarded: the call opcode's own charges, made before the call reached the interceptor, stay charged; the answer itself charges nothing unless its contract's page says otherwise; the forwarded regular gas returns to the caller untouched, and the reservoir share the caller gave the call returns to it by the child-merge rule of [Two-Pool Gas](../evm/gas-model.md).
+- `SATIN-ICPT-004` An interceptor's answer MUST return to the caller as the result of a frame that ran on the child's regular gas, the forward plus a value call's `CALL_STIPEND` (`SATIN-FWD-003`): the call opcode's regular charges, made before the call reached the interceptor, stay charged; the history the opcode charged for the records of a value call its caller can fund is given back into the caller's reservoir, since an answer moves no value (`SATIN-HIST-023`); the answer itself charges nothing unless its contract's page says otherwise; the child's regular gas returns to the caller untouched, the stipend included, and the reservoir share the caller gave the call returns to it by the child-merge rule of [Two-Pool Gas](../evm/gas-model.md) (`SATIN-POOL-012`).
   A successful answer's output is the method's ABI-encoded return value; a refusal's is the error's ABI encoding, returned with a revert.
   An answer writes no account, no storage and no log, and moves no value.
 - `SATIN-ICPT-005` Under [gas detention](../evm/gas-detention.md), an answer whose regular spend exceeds the calling frame's allowance — state and history gas that regular gas paid not counted — MUST be the crossing: the answer's whole regular spend is treated as the one charge that crossed, none of it billed, the part within the allowance included, and the call is stopped as [Limit Stops](../evm/limit-stops.md) specifies, with the effect the answer would have made not made.
@@ -92,12 +94,13 @@ The table below is informative: each input is the selector followed by the words
 | ------------------------ | -------------------------------------------- | ------------------------------------------------------------ |
 | `CALL_STACK_LIMIT`       | 1,024                                        | The deepest frame a call may start                           |
 | `KEYLESS_DEPLOY_ADDRESS` | `0x6342000000000000000000000000000000000003` | KeylessDeploy (see [System Contracts](overview.md))          |
+| `CALL_STIPEND`           | 2,300                                        | Stipend a value-transferring `CALL` adds to the child ([Gas Forwarding](../evm/gas-forwarding.md)) |
 
 ## Rationale
 
 **Why answer before a frame is built?**
 By then the call opcode has made its own charges, so the answer needs no accounting of its own, and no frame is created only to be discarded.
-The answer then returns exactly as a frame's result would, so the caller settles it with the rules every call follows.
+The answer then returns exactly as a frame's result would, so the caller settles it with the rules every call follows: the child's gas comes back, and what the opcode charged for a start that did not happen is given back, as after any call that fails ([History Gas and the History Allowance](../evm/history-gas.md), `SATIN-HIST-023`).
 
 **Why intercept before the frame start, the funds check included?**
 Rex6 ran its interceptors before it built the call's frame, and building the frame is where the caller's funds were checked and the value moved; Satin keeps that order (`SATIN-ICPT-007`).

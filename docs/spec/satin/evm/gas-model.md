@@ -85,7 +85,8 @@ Every pattern of a write and its take-back, with what each ledger does, is liste
 
   The caller MUST keep `remaining − reservoir_share`.
   The regular gas the caller asks to forward MUST NOT bound `reservoir_share`: a start that forwards no regular gas still receives the share ([Gas Forwarding](gas-forwarding.md)).
-- `SATIN-POOL-012` When a start returns — whether it was answered without building a frame (a precompile, a call to an account with no code, an interceptor's answer) or a built frame returned — the reservoir the child returns MUST join the reservoir the caller kept at the start, `remaining − reservoir_share` (`SATIN-POOL-011`), and the caller's regular gas MUST rise by the regular gas the child returns and by nothing else: the child's unused regular gas after a success, a revert or a stop, and none after an exceptional halt.
+- `SATIN-POOL-012` When a start returns — whether it was answered without building a frame (a precompile, a call to an account with no code, an interceptor's answer, a call refused past the call-depth limit or for a value its caller cannot fund) or a built frame returned — the reservoir the child returns MUST join the reservoir the caller kept at the start, `remaining − reservoir_share` (`SATIN-POOL-011`), and the caller's regular gas MUST rise by the regular gas the child returns and by nothing else: the child's unused regular gas after a success, a revert, a stop or a refusal, and none after an exceptional halt.
+  The child's regular gas is that of `SATIN-FWD-003`, a value call's `CALL_STIPEND` included: a refused start uses none of it and MUST return all of it, as an interceptor's answer that charges nothing does (`SATIN-HIST-023`).
   The returned reservoir — the reservoir the child holds when it returns, after its own rollback when it failed (`SATIN-POOL-014`) — MUST NOT be credited to the caller's regular gas.
   A caller with 100 reservoir after the start's charges keeps 2 and gives the child 98; a child that returns all 98 leaves the caller 100, whatever regular gas the caller paid for state before.
 - `SATIN-POOL-014` When a frame reverts, or is stopped by a limit, the state and history charges it made, and those its successful children merged into it, net of the give-backs it and they received (`SATIN-HIST-007`), MUST be given back into its own reservoir by this formula, which is the one definition of a frame's reservoir after a revert or a stop:
@@ -143,6 +144,7 @@ Every pattern of a write and its take-back, with what each ledger does, is liste
 | `GAS_RETAINED_NUMERATOR`    | 2           | Numerator of the part of its reservoir a caller keeps at a start                     |
 | `GAS_RETAINED_DENOMINATOR`  | 100         | Denominator of the part of its reservoir a caller keeps at a start                   |
 | `TX_MAX_TOTAL_GAS_LIMIT`    | 2^32 − 1    | EIP-8037's transaction gas cap, which a node does not apply (`SATIN-POOL-003`)       |
+| `CALL_STIPEND`              | 2,300       | Stipend a value-transferring `CALL` or `CALLCODE` adds to the child ([Gas Forwarding](gas-forwarding.md)) |
 
 ## Rationale
 
