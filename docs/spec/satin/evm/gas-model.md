@@ -123,7 +123,6 @@ How a give-back of state or history gas is credited is `SATIN-HIST-012` ([Histor
   - `state`, `history` — the state and history charges kept, net of every give-back.
 
   The EIP-3529 refund MUST NOT lower any ledger, and the floor MUST NOT raise one: the receipt's gas used and the three ledgers are separate figures.
-  The ledgers of a call that clears one cold slot whose original value is not zero, and does nothing else, are pinned by the conformance case `satin/sstore/clear/specification-example`.
   State or history gas that regular gas paid, a legacy share or a spill, MUST stay on its own ledger.
   The ledgers of a failed deposit are specified on [Deposit Transactions](../block/deposits.md).
 - `SATIN-POOL-020` The EIP-7623 floor, as EIP-7976 and EIP-7981 amend it, MUST be computed and validated as the Amsterdam schedule computes it, from the base and per-byte costs of [Gas Schedule and Intrinsic Gas](gas-schedule.md).
