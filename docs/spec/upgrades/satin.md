@@ -1018,6 +1018,7 @@ The reference implementation has no price for one, so it runs such a precompile 
   For a call that reaches the delegate refusal, the retained regular charge is the opcode's own memory expansion plus 3,000 for a cold target or 100 for a warm target; when the cold surcharge is gas detention's crossing, only 100 and the memory expansion remain charged.
   A call that fails or is stopped before the target's load, or whose cold load is skipped for insufficient whole regular gas, does not read the target.
   A target and its code already loaded before a delegation-guard failure remain in the transaction's read set.
+  Either failure, unless it is a stop, ends the frame with an out-of-gas halt (or, when the static-context check fails, that check's halt), which returns no data and none of the frame's regular gas, where Rex6 reverted with `VolatileDataAccessDisabled(10)`.
   A detained cold surcharge that crosses returns the 68 bytes of `MegaLimitExceeded(2, limit)` instead of the 36 bytes of `VolatileDataAccessDisabled(10)`.
 - The error's argument MUST be ABI-encoded as a `uint8`:
 

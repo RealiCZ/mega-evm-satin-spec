@@ -76,13 +76,13 @@ interface IMegaAccessControl {
   A `BLOCKHASH` MUST be refused as `BLOCKHASH`, access type 7, whatever its operand.
 - `SATIN-MAC-004` A refused read MUST revert the frame with `VolatileDataAccessDisabled(accessType)`, unless it is a call refused at its target's EIP-7702 delegate (`SATIN-MAC-007`) whose cold surcharge is gas detention's crossing, which MUST stop the frame with `MegaLimitExceeded(2, limit)` instead ([Limit Stops](../evm/limit-stops.md)).
   A read refused before the opcode's body, by the first two items of `SATIN-MAC-003`, MUST NOT consume any gas: neither the opcode's static gas nor any dynamic cost (a cold access, a copy's memory, a call's memory or value transfer).
-  The frame MUST revert on the gas it held when the opcode was reached, nothing having been charged, and a frame whose regular gas is below the opcode's static gas, or below what the opcode's body would charge, MUST be refused all the same and MUST NOT run out of gas.
-  A call refused at its target's delegate has made its earlier steps and read its target's account and code, which is not a volatile read; it MUST pay its target's access and its memory expansion, and nothing else:
+  Such a frame MUST revert on the gas it held when the opcode was reached, nothing having been charged, and a frame whose regular gas is below the opcode's static gas, or below what the opcode's body would charge, MUST be refused all the same and MUST NOT run out of gas.
+  A call refused at its target's delegate has made its earlier steps and read its target's account and code, which is not a volatile read; it MUST pay its target's access (its cold surcharge unless that is gas detention's crossing) and its memory expansion, and nothing else:
   - its regular gas, the spendable and the withheld part, MUST be restored to what it held when the opcode was reached;
   - it MUST then be charged, as regular charges and in this order: its static cost, `WARM_STORAGE_READ_COST`; its memory expansion; and, when the target was not warm, its cold surcharge, `COLD_ACCOUNT_ACCESS − WARM_STORAGE_READ_COST`, last;
   - its memory expansion is this opcode's own growth of memory for its input and output ranges together, at the base layer's price, and nothing for a range already within the frame's memory; it is not the frame's whole memory cost.
 
-  The first two charges leave the call's gas as it was just after its memory expansion, so the static cost and the memory expansion remain charged and count as compute (`SATIN-DET-009`); the value-transfer cost of a call that carries value is given back, and the refused delegate's access is never charged.
+  The first two charges leave the call's gas as it was just after its memory expansion, so the static cost and the memory expansion remain charged and count as compute once (`SATIN-DET-009`); the value-transfer cost of a call that carries value is given back by the restoration and is not compute, and the refused delegate's access is never charged.
   The cold surcharge MUST come last: when it is gas detention's crossing, the gas is put back to what it was just before it (`SATIN-DET-018`), so the memory expansion stays charged at the stop as well.
   Nothing before the delegate's load draws on the reservoir, so the restoration and the charges leave it as the opcode found it; the frame's end then rolls back its own state and history charges as any revert or stop does (`SATIN-POOL-014`).
   A refused read marks nothing for gas detention and asks no oracle service.
@@ -160,7 +160,8 @@ This is a change from [Rex6](../../upgrades/rex6.md), which read the target befo
 For a call that reaches the delegate refusal, the retained regular charge is the opcode's own memory expansion plus 3,000 for a cold target or 100 for a warm target; when the cold surcharge is gas detention's crossing, only 100 and the memory expansion remain charged.
 A call that fails or is stopped before the target's load, or whose cold load is skipped for insufficient whole regular gas, does not read the target.
 A target and its code already loaded before a delegation-guard failure remain in the transaction's read set.
-Either failure returns different gas from Rex6's free refusal, and the first also leaves out of the read set a target Rex6 read.
+Either failure returns different gas from Rex6's free refusal and, unless it is a stop, ends the frame with an out-of-gas halt (or, when the static-context check fails, that check's halt), which returns no data and none of the frame's regular gas, where Rex6 reverted with `VolatileDataAccessDisabled(10)`.
+The first also leaves out of the read set a target Rex6 read.
 A cold surcharge that is gas detention's crossing ends the frame with the 68 bytes of `MegaLimitExceeded(2, limit)` instead of the 36 bytes of `VolatileDataAccessDisabled(10)`.
 
 **Why does a delegate refusal keep the call's memory expansion charged?**
