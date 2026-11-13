@@ -51,6 +51,7 @@ Rex6 bounded it by lowering the transaction's limit on a separate compute-gas le
   Compute can therefore exceed the transaction's regular ledger by the stipends of its value calls.
 - `SATIN-DET-011` What a halting frame burns — the regular gas it had left when it halted — MUST NOT count as compute, whatever it could not pay: a dynamic charge, an opcode's static gas, a cold access, or state or history gas its regular gas had to pay.
   A precompile that runs out of gas MUST count nothing of its forward as compute: it burns the forward, a value call's stipend included, unless it is the crossing (`SATIN-DET-021`), and then the forward returns to its caller.
+  A precompile that halts (out of gas, or on a check it makes after its gas charge, a ModExp input over EIP-7823's bound among them) burns its whole forward, its charged price and a value call's stipend included, and MUST count none of it as compute; only a precompile that is the crossing (`SATIN-DET-021`) returns its forward.
 
 ### The limit
 
