@@ -366,7 +366,7 @@ Home: [Halts, Reverts and Stops](evm/outcomes.md)
 | [`SATIN-OUT-005`](evm/outcomes.md) | A failed deposit MUST use its whole gas limit and report no stop (Deposit Transactions). |
 | [`SATIN-OUT-006`](evm/outcomes.md) | A charge made before the first frame that the transaction cannot pay MUST end the transaction out of gas without running a frame, as `SATIN-SCHED-009` and `SATIN-SCHED-010` specify (Gas Schedule and Intrinsic Gas): a … |
 | [`SATIN-OUT-007`](evm/outcomes.md) | A real out-of-gas, a precompile given less than its price, an invalid opcode, and every other exceptional halt of the base layer (Base Layer) MUST halt and consume the halting frame's regular gas (`SATIN-POOL-014`). |
-| [`SATIN-OUT-008`](evm/outcomes.md) | A refused volatile read MUST revert its frame with `VolatileDataAccessDisabled(uint8)`, as MegaAccessControl specifies. |
+| [`SATIN-OUT-008`](evm/outcomes.md) | A refused volatile read MUST revert its frame with `VolatileDataAccessDisabled(uint8)`, as MegaAccessControl specifies, with one exception: a call refused at its target's EIP-7702 delegate whose cold surcharge is gas … |
 | [`SATIN-OUT-009`](evm/outcomes.md) | A system contract's own refusal (for example `NonZeroTransfer()` or `NotIntercepted()`) MUST revert with its own error (Call Interception); a keyless deployment's step refuses or halts as `SATIN-KEY-004` states … |
 | [`SATIN-OUT-010`](evm/outcomes.md) | A call refused at the depth gate, or at its frame start for a value its caller cannot fund, MUST fail with empty return data and count nothing for the refused start (`SATIN-LIM-015`); it is neither a halt of the caller … |
 | [`SATIN-OUT-011`](evm/outcomes.md) | A precompile that fails MUST consume all the gas forwarded to it (Precompiles), and a start answered with that failure is not replaced by a stop (`SATIN-LIM-014`). |
@@ -418,7 +418,7 @@ Home: [Precompiles](evm/precompiles.md)
 | [`SATIN-PCMP-005`](evm/precompiles.md) | An input over one of those size limits MUST fail the call before any gas check, as the Optimism specification of the limit has it, a call forwarded no gas included, and MUST consume all the gas forwarded to it, as every … |
 | [`SATIN-PCMP-006`](evm/precompiles.md) | A KZG point evaluation call given less than `KZG_POINT_EVALUATION_GAS` MUST fail out of gas before any verification runs; a successful call MUST be charged exactly `KZG_POINT_EVALUATION_GAS`; and a call given at least … |
 | [`SATIN-PCMP-007`](evm/precompiles.md) | ModExp MUST charge and check its input in this order: its `MODEXP_MIN_GAS` minimum, a call that cannot pay it failing before the lengths are read; then the rest of its formula price; then EIP-7823's bound, an input over … |
-| [`SATIN-PCMP-008`](evm/precompiles.md) | A call whose address is a precompile's MUST run that precompile, and MUST be priced by it for gas detention (Gas Detention), whatever code the state holds at the address, an EIP-7702 delegation indicator included. |
+| [`SATIN-PCMP-008`](evm/precompiles.md) | A call that reaches precompile dispatch and whose address is a precompile's MUST run that precompile, and MUST be priced by it for gas detention (Gas Detention), whatever code the state holds at the address, an EIP-7702 … |
 
 ## System Contracts
 
@@ -508,10 +508,10 @@ Home: [MegaAccessControl](system-contracts/mega-access-control.md)
 | [`SATIN-MAC-001`](system-contracts/mega-access-control.md) | MegaAccessControl MUST be the account at `MEGA_ACCESS_CONTROL_ADDRESS` holding the code `MEGA_ACCESS_CONTROL_CODE_HASH` (see System Contracts), whose interface is: |
 | [`SATIN-MAC-002`](system-contracts/mega-access-control.md) | `disableVolatileDataAccess()` MUST switch access off only once its answer is settled; an answer that gas detention turns into the compute stop (see Call Interception, `SATIN-ICPT-005`) MUST leave the switch as it was. |
 | [`SATIN-MAC-003`](system-contracts/mega-access-control.md) | In a frame whose volatile-data access is off, every volatile read (see Gas Detention) MUST be refused: |
-| [`SATIN-MAC-004`](system-contracts/mega-access-control.md) | A refused read MUST revert the frame with `VolatileDataAccessDisabled(accessType)` and MUST NOT consume any gas: neither the opcode's static gas nor any dynamic cost — a cold access, a copy's memory, a call's memory or … |
+| [`SATIN-MAC-004`](system-contracts/mega-access-control.md) | A refused read MUST revert the frame with `VolatileDataAccessDisabled(accessType)`, unless it is a call refused at its target's EIP-7702 delegate (`SATIN-MAC-007`) whose cold surcharge is gas detention's crossing, which … |
 | [`SATIN-MAC-005`](system-contracts/mega-access-control.md) | The error's argument MUST be ABI-encoded as a `uint8`, with the value of the table below. |
 | [`SATIN-MAC-006`](system-contracts/mega-access-control.md) | A `CREATE` or `CREATE2` MUST NOT be refused in a frame whose access is off, even when its creator or its created address is the block beneficiary: its loads of them are the creation's own checks, not volatile reads. |
-| [`SATIN-MAC-007`](system-contracts/mega-access-control.md) | A call opcode whose target's EIP-7702 delegate is the block beneficiary MUST be refused as the beneficiary's account (type 10), by the rule of `SATIN-MAC-003`: in a frame whose access is off, the opcode reads its … |
+| [`SATIN-MAC-007`](system-contracts/mega-access-control.md) | In a frame whose volatile-data access is off, a call opcode (`CALL`, `CALLCODE`, `DELEGATECALL` or `STATICCALL`) whose target operand is not the block beneficiary MUST read its target only at the target's load, after … |
 
 ## MegaLimitControl
 
@@ -659,7 +659,7 @@ Home: [The Stateless Witness](block/stateless-witness.md)
 | [`SATIN-WIT-009`](block/stateless-witness.md) | `BLOCKHASH` reads the chain's history outside the transaction's journal, and its reads MUST be exported (`SATIN-WIT-014`); a SALT bucket's capacity is read outside the database, and MUST be exported (`SATIN-WIT-013`); … |
 | [`SATIN-WIT-010`](block/stateless-witness.md) | A validator MUST be given, beside the witness: the block's header, the chain configuration (its fork schedule), the parent block's hash and timestamp, the parent beacon block root, and the block's extra data. |
 | [`SATIN-WIT-011`](block/stateless-witness.md) | The L1 block contract at `L1_BLOCK_ADDRESS` is read, when it is needed, by two reads of the base layer: |
-| [`SATIN-WIT-012`](block/stateless-witness.md) | A read that gas or a limit skipped is skipped again on replay, so the witness MUST NOT be required to carry it: a cold `SLOAD` or account load with less gas than its cold surcharge, other than an Oracle read, which is … |
+| [`SATIN-WIT-012`](block/stateless-witness.md) | A read that gas or a limit skipped is skipped again on replay, so the witness MUST NOT be required to carry it: a cold `SLOAD` or account load with less whole regular gas than its cold surcharge, other than an Oracle … |
 | [`SATIN-WIT-013`](block/stateless-witness.md) | Block execution MUST export the set of SALT buckets the SALT environment answered with a valid capacity during the block, emptied when the block starts and accumulated over everything executed for the block. |
 | [`SATIN-WIT-014`](block/stateless-witness.md) | Block execution MUST export every block hash `BLOCKHASH` was served during the block, emptied when the block starts; it is not what a node's state cache holds, which may carry hashes an earlier block read. |
 | [`SATIN-WIT-016`](block/stateless-witness.md) | A block replayed on exactly its witness MUST produce the same receipts, state changes, gas ledgers, logs and block counters as the block's execution, and MUST read nothing the witness does not hold. |
