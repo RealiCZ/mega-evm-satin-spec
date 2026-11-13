@@ -66,6 +66,7 @@ A read the building node does not report is missing from the witness, and the va
 ### Reads a validator makes again
 
 - `SATIN-WIT-012` A read that gas or a limit skipped is skipped again on replay, so the witness MUST NOT be required to carry it: a cold `SLOAD` or account load with less gas than its cold surcharge, other than an Oracle read, which is made before its charge (`SATIN-ORCL-004`), a `BLOCKHASH` of the current block, a future block or a block outside the last `BLOCKHASH_WINDOW` blocks, a read refused in a frame whose volatile-data access is off, a keyless deployment's reads after a step refused it, and the bucket of a state charge a system-originated transaction or a system call makes.
+  A call's completed read of its target's account and code is not among them: it MUST stay in the witness when the call's delegate is then refused, and when the target's cold surcharge is then gas detention's crossing ([MegaAccessControl](../system-contracts/mega-access-control.md), `SATIN-MAC-007`).
 
 ### The exports
 

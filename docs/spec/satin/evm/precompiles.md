@@ -43,7 +43,8 @@ Gas detention decides a precompile call from its price before it runs ([Gas Dete
 - `SATIN-PCMP-004` The OP precompiles' input size limits MUST be those the table of `SATIN-PCMP-001` gives BN254 pairing (`0x08`) and BLS12-381 G1 MSM (`0x0C`), G2 MSM (`0x0E`) and pairing (`0x0F`).
 - `SATIN-PCMP-005` An input over one of those size limits MUST fail the call before any gas check, as the Optimism specification of the limit has it, a call forwarded no gas included, and MUST consume all the gas forwarded to it, as every precompile call that fails does.
 - `SATIN-PCMP-006` A KZG point evaluation call given less than `KZG_POINT_EVALUATION_GAS` MUST fail out of gas before any verification runs; a successful call MUST be charged exactly `KZG_POINT_EVALUATION_GAS`; and a call given at least `KZG_POINT_EVALUATION_GAS` that fails otherwise — an input of the wrong length, a versioned hash that does not match the commitment, a proof that does not verify — MUST consume all the gas forwarded to it.
-- `SATIN-PCMP-008` A call whose address is a precompile's MUST run that precompile, and MUST be priced by it for gas detention ([Gas Detention](gas-detention.md)), whatever code the state holds at the address, an EIP-7702 delegation indicator included.
+- `SATIN-PCMP-008` A call that reaches precompile dispatch and whose address is a precompile's MUST run that precompile, and MUST be priced by it for gas detention ([Gas Detention](gas-detention.md)), whatever code the state holds at the address, an EIP-7702 delegation indicator included.
+  The rule does not exempt the call from the call opcode's earlier charges, checks or refusal: in a frame whose volatile-data access is off, a call to a precompile address whose indicator names the block beneficiary ends at or before the delegate's load and never reaches dispatch ([MegaAccessControl](../system-contracts/mega-access-control.md), `SATIN-MAC-007`).
 
 ### Retired ids
 
