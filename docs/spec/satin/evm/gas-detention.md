@@ -93,7 +93,10 @@ A transaction that read volatile data therefore runs exactly as it would without
   - priced within the allowance, it runs on its whole forward;
   - priced past the allowance and within its forward, it MUST NOT run and is the crossing;
   - priced past its whole forward, it runs on its forward and fails, as without the read.
-- `SATIN-DET-022` The call's value has not moved when the price is consulted, so a call that is the crossing MUST be held to the price alone: the stop is kind 2, whatever records its value transfer would have made.
+
+  The forward the price is held against is the child's whole regular gas (`SATIN-FWD-003`), a value call's `CALL_STIPEND` included, as `SATIN-DET-011` and `SATIN-STOP-014` count it.
+- `SATIN-DET-022` The call's value has not moved when the price is consulted, so a call that is the crossing MUST be held to the price alone: the stop is kind 2, whatever records and state growth its value transfer would have made.
+  A value call to a precompile whose account the state does not hold, or holds empty under EIP-161 (`SATIN-STATE-011`), pays that account's new-account state gas in the opcode, before its forward is computed and before the price is consulted (`SATIN-HIST-010`, `SATIN-HIST-023`); when the call is the crossing, the account is not created, and that charge, its legacy share included, MUST be given back into the caller's reservoir when the stop returns (`SATIN-POOL-015`).
 - `SATIN-DET-023` Every precompile of the precompile set (`SATIN-PCMP-001`, [Precompiles](precompiles.md)) MUST have a price for every input, which is the gas the precompile charges for that input before any check it makes after its gas charge:
   - an input over an OP precompile's size limit (`SATIN-PCMP-004`) is priced at zero, since it is refused before any gas check;
   - a ModExp input is priced by its Osaka formula whatever its lengths, an input over EIP-7823's bound included, since ModExp charges that price before it checks the bound (`SATIN-PCMP-007`).
