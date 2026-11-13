@@ -39,6 +39,7 @@ A charge that depends on state cannot be made correctly before the state is read
   | ---------------------------------------------------- | ------ | ------- |
   | Warm storage read                                    | 100    | 100     |
   | Cold account access, additional                      | 2,500  | 2,900   |
+  | Cold `SELFDESTRUCT` beneficiary, the whole access    | 2,600  | 3,000   |
   | Cold storage access of an `SLOAD`, additional        | 2,000  | 2,000   |
   | Cold storage access of an `SSTORE`, additional       | 2,100  | 2,000   |
   | Value transfer of a call, with its 2,300 stipend     | 9,000  | 11,300  |
@@ -72,7 +73,9 @@ A charge that depends on state cannot be made correctly before the state is read
   | Floor tokens per access-list byte                    | 0      | 4       |
 
   The state-gas entries are the price at `m = 1`; a state charge is scaled by its bucket's multiplier ([State Gas and SALT Pricing](state-gas.md)).
-- `SATIN-SCHED-004` A cold `SSTORE` MUST pay `COLD_STORAGE_ACCESS` (2,100) for its access together with its static cost, as a cold `SLOAD` does: EIP-8038 folds the warm base into a cold slot's access.
+  An opcode whose static gas is the warm read pays the additional cold account access for an account that is not warm; `SELFDESTRUCT`'s static gas holds no warm read, so a beneficiary that is not warm costs it the whole `COLD_ACCOUNT_ACCESS`, as EIP-2929 charges it.
+- `SATIN-SCHED-004` A cold `SSTORE` MUST pay `COLD_STORAGE_ACCESS` (2,100) for its access, its static cost included, as a cold `SLOAD` does: EIP-8038 folds the warm base into a cold slot's access.
+  The static cost, `WARM_STORAGE_READ_COST`, MUST be a charge of its own, made before the slot is loaded; the rest of the access, `COLD_STORAGE_ACCESS − WARM_STORAGE_READ_COST`, MUST be charged after the load, in one charge with the cost of the write, so gas detention holds the two charges to the spendable part one after the other (`SATIN-DET-018`).
 
 ### Intrinsic regular gas and the floor
 

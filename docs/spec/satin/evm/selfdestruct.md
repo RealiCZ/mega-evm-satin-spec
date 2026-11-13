@@ -62,6 +62,7 @@ If it is given back carelessly, a destruction can give back what another transac
 
 - `SATIN-SD-011` A later `SELFDESTRUCT` of the same account while the mark stands MUST apply the table for nothing: it subtracts nothing, refills nothing and takes nothing back.
 - `SATIN-SD-013` From the first effective destruction until the end of the transaction, while the mark stands, the account MUST add nothing further to state growth and keep no further state gas: an `SSTORE` of one of its slots neither rises nor falls and neither charges nor refills fresh-slot state gas, its regular gas being unchanged.
+  The mark MUST NOT change what such an `SSTORE` does to the EIP-3529 refund counter: a store that clears the slot or restores its original value moves the counter by the inherited `SSTORE` rules, on the slot's original, present and new values, as it would without the mark (`SATIN-TAKE-003`).
   A write to the account or to one of its slots makes no record.
 - `SATIN-SD-014` Code deposited after a constructor destroyed its own account, on the absent-then-absent row, MUST NOT be charged state gas; its data size and history gas MUST be charged as any deposited code's, and no later destruction takes them back.
 - `SATIN-SD-015` Value sent to the marked account MUST NOT be a rise and MUST make no write record.

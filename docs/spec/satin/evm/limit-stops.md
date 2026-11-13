@@ -62,8 +62,7 @@ A transaction therefore never keeps more data size, KV updates or state growth t
   A frame answered with a failure kept nothing, and its answer MUST NOT be replaced by a stop: a precompile that fails consumes the gas forwarded to it, as without a limit.
   A precompile whose price crosses gas detention moves nothing, and MUST be held to the price alone: its result is the compute stop, whatever records its value transfer would have made (`SATIN-DET-022`).
 - `SATIN-STOP-015` A stopped creation MUST keep its creator's nonce bump, and that write's record MUST be counted on the creator when the creation returns: the creator MUST be held to its limits with it before it runs on, and be stopped if it crosses one (`SATIN-LIM-008`).
-- `SATIN-STOP-016` A frame answered without running whose answer is then rewritten to the stop — by gas detention ([Gas Detention](gas-detention.md)) — MUST have what its start moved reverted with it, as a frame that fails has.
-- `SATIN-STOP-017` A node MUST NOT stop a transaction for data size counted before its first frame: validation rejects a transaction whose body, with a write record for each authorization entry, would cross the data-size limit ([Transaction Validation and Refusals](../block/transaction-validation.md)), so nothing counted before the first frame crosses it.
+- `SATIN-STOP-017` A node MUST NOT stop a transaction for data size counted before its first frame: validation's data-size check (`SATIN-VAL-003` step 1, [Transaction Validation and Refusals](../block/transaction-validation.md)) leaves nothing counted there that crosses the limit.
   KV updates and state growth can cross before the first frame only on the authorization list, which is then skipped ([EIP-7702 Authorizations Before the First Frame](authorizations.md)).
 
 ### The revert data
@@ -87,7 +86,7 @@ A transaction therefore never keeps more data size, KV updates or state growth t
 
 ### Retired ids
 
-None.
+- `SATIN-STOP-016` Retired, removed: no transaction reaches it. The answers gas detention rewrites to the stop have moved nothing when they are rewritten: a precompile's is decided from its price before its value moves (`SATIN-DET-021`, `SATIN-DET-022`, `SATIN-STOP-014`), and an interceptor's is made before the frame start (`SATIN-DET-025`, `SATIN-ICPT-007`), so neither has anything of its start to revert.
 
 ## Constants
 
