@@ -919,7 +919,7 @@ The revert data:
 | 3      | State growth            | The limit or frame budget crossed, as a count of new accounts and new slots                        |
 
 The discriminants are Rex6's, so a decoder of the Rex6 revert data decodes Satin's.
-Every limit stop carries `MegaLimitExceeded`, in every dimension, and a refusal the protocol makes that is not a limit stop MUST NOT carry it: a refused volatile read reverts with `VolatileDataAccessDisabled(uint8)` (see [Volatile-Data Access Control](#13-volatile-data-access-control-and-remainingcomputegas)), the system contracts' and a keyless deployment's refusals carry their own errors (see [Native Keyless Deployment](#15-native-keyless-deployment)), a call past the call-depth limit or with a value its caller cannot fund fails with empty return data, and a halt has no return data.
+Every limit stop carries `MegaLimitExceeded`, in every dimension, and a refusal the protocol makes that is not a limit stop MUST NOT carry it: a refused volatile read whose charges are not gas detention's crossing reverts with `VolatileDataAccessDisabled(uint8)` (see [Volatile-Data Access Control](#13-volatile-data-access-control-and-remainingcomputegas)), the system contracts' and a keyless deployment's refusals carry their own errors (see [Native Keyless Deployment](#15-native-keyless-deployment)), a call past the call-depth limit or with a value its caller cannot fund fails with empty return data, and a halt has no return data.
 Kind 0, kind 1 and kind 3 name the frame budget when that budget is crossed, including when the transaction limit of the same dimension is crossed too.
 They name the transaction limit when the frame budget is not crossed, whether or not a frame budget applies to the operation (see [Resource Limits](#10-resource-limits)).
 Kind 2 names the compute limit, which the transaction's compute does not exceed (see [Gas Detention on Withheld Gas](#12-gas-detention-on-withheld-gas)).
@@ -1003,17 +1003,22 @@ The reference implementation has no price for one, so it runs such a precompile 
 
 - `MegaAccessControl`'s interface, errors, and the scope of `disableVolatileDataAccess()`, `enableVolatileDataAccess()` and `isVolatileDataAccessDisabled()` are unchanged.
 - `disableVolatileDataAccess()` switches access off once its answer is settled; an answer gas detention turns into the compute stop (see [Gas Detention on Withheld Gas](#12-gas-detention-on-withheld-gas)) MUST leave the switch as it was.
-- An opcode volatile whatever its operands (`NUMBER`, `TIMESTAMP`, `COINBASE`, `PREVRANDAO`, `GASLIMIT`, `BASEFEE`, `BLOBBASEFEE`, `SLOTNUM` and `BLOCKHASH`) is refused before its operands are checked, as in Rex6.
-  An opcode volatile only for the account or the storage it reads is refused once every operand it takes is on the stack, so one that fails on its operands (a stack underflow, for example) fails as it would with access on, and before its body charges or checks anything.
+- In a frame whose volatile-data access is off, an opcode volatile whatever its operands (`NUMBER`, `TIMESTAMP`, `COINBASE`, `PREVRANDAO`, `GASLIMIT`, `BASEFEE`, `BLOBBASEFEE`, `SLOTNUM` and `BLOCKHASH`) is refused before its operands are checked, as in Rex6.
+  For a volatile read identified directly by the opcode's operands or its frame, every operand MUST be present before the refusal, and the refusal MUST precede the opcode's body, so an opcode that fails on its operands (a stack underflow, for example) fails as it would with access on.
+  A call whose non-beneficiary target delegates to the beneficiary follows the separate rule below.
   Every refusal comes before the opcode pushes its result, so a read on a full stack is refused rather than overflowing it.
   A `BLOCKHASH` is refused as `BLOCKHASH` (7) whatever its operand.
-- Such a refusal MUST revert the frame with `VolatileDataAccessDisabled(accessType)` and pays nothing, as in Rex6: not the opcode's static gas, not a cold access, not a copy's or a call's memory, not a value transfer; a frame below the opcode's static gas is refused all the same.
-- A call opcode whose target operand is not the beneficiary MUST look nothing up before its own steps, a change from Rex6.
+- Such a direct refusal MUST revert the frame with `VolatileDataAccessDisabled(accessType)` and pays nothing, as in Rex6: not the opcode's static gas, not a cold access, not a copy's or a call's memory, not a value transfer; a frame below the opcode's static gas is refused all the same.
+- In a frame whose volatile-data access is off, a call opcode whose target operand is not the beneficiary MUST look nothing up before its own steps, a change from Rex6.
   It makes, as with access on, its static cost, the static-context check of a `CALL` with value, its own memory expansion for its input and output ranges, the value-transfer cost, the load of its target (skipped with an out-of-gas halt when the target is cold and the regular gas left cannot pay its 2,900 cold surcharge) and the delegation guard, and fails at any of them, or is stopped at one by gas detention, as with access on.
   When it reaches its delegate's load and the delegate is the beneficiary, the load is refused before the target's cold surcharge, any new-account state gas, the forward, the start's history gas and any frame start.
   The call's gas is restored to what it held at the opcode and then charged, in this order, its static cost of 100, its memory expansion and, for a target that was not warm, the 2,900 cold surcharge, last: the call pays 3,000 for a cold target or 100 for a warm one, plus its memory expansion, and gets its value-transfer cost back.
   The frame MUST revert with `VolatileDataAccessDisabled(10)`, or, when the cold surcharge is gas detention's crossing, MUST be stopped with `MegaLimitExceeded(2, limit)`; either way the target stays in the read set, and warming rolls back to the ending frame's checkpoint.
-  Its side effects against Rex6 are accepted: a caller gets 3,000 or 100 gas less back from such a refusal; a call that cannot pay its earlier steps halts or is stopped before it reads its target, which changes the gas it returns and the read set; and a detained cold surcharge that crosses returns the 68 bytes of `MegaLimitExceeded(2, limit)` instead of the 36 bytes of `VolatileDataAccessDisabled(10)`.
+  Its side effects against Rex6 are accepted.
+  For a call that reaches the delegate refusal, the retained regular charge is the opcode's own memory expansion plus 3,000 for a cold target or 100 for a warm target; when the cold surcharge is gas detention's crossing, only 100 and the memory expansion remain charged.
+  A call that fails or is stopped before the target's load, or whose cold load is skipped for insufficient whole regular gas, does not read the target.
+  A target and its code already loaded before a delegation-guard failure remain in the transaction's read set.
+  A detained cold surcharge that crosses returns the 68 bytes of `MegaLimitExceeded(2, limit)` instead of the 36 bytes of `VolatileDataAccessDisabled(10)`.
 - The error's argument MUST be ABI-encoded as a `uint8`:
 
   | `accessType` | Read                            |

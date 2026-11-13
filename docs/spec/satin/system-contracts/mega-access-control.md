@@ -112,14 +112,14 @@ interface IMegaAccessControl {
   - the load of its target's account and code, skipped with an out-of-gas halt when the target is not warm and the regular gas left, both parts counted (`SATIN-DET-015`), is below the cold surcharge, `COLD_ACCOUNT_ACCESS − WARM_STORAGE_READ_COST`;
   - when the target holds an EIP-7702 delegation indicator, the delegation guard, which halts the call out of gas unless the regular gas left, both parts counted, covers the target's cold surcharge, not yet deducted (the surcharge for a target that was not warm, zero for one that was), plus `WARM_STORAGE_READ_COST` for the delegate's access; the static cost the call has paid is not counted again.
 
-  A call that fails at one of these steps, or is stopped at one as gas detention's crossing (`SATIN-DET-018`), has not reached its delegate's load and MUST end as it would with access on; it has read its target's account and code exactly when it reached the target's load.
+  A call that fails at one of these steps, or is stopped at one as gas detention's crossing (`SATIN-DET-018`), has not reached its delegate's load and MUST end as it would with access on; it has read its target's account and code exactly when it made the target's load, which a cold load skipped for its surcharge does not make.
   When the call reaches its delegate's load and that one-hop delegate is the block beneficiary, the load MUST be refused as the beneficiary's account (type 10) before anything else on the call's path: before the target's cold surcharge is deducted, before any new-account state gas, the forward and the start's history gas, and before any frame starts.
   The beneficiary's account MUST NOT be loaded, and the call's gas MUST be settled as `SATIN-MAC-004` states.
   For these rules the target was warm when it was among EIP-2929's accessed addresses as they stood when the call reached the target's load: the addresses warm from the transaction's start (`SATIN-SCHED-012`, `SATIN-SCHED-014`), and every address an earlier access warmed that no rollback has taken back, the authorities the authorization list's application warmed included (`SATIN-AUTH-014`); the call's own load of the target does not count.
   No charge of that settlement can run out of gas: the static cost and the memory expansion were paid from the same gas before the delegate's load, and the delegation guard held the regular gas left after them and after the value-transfer cost to at least the cold surcharge plus `WARM_STORAGE_READ_COST`.
   The cold surcharge MUST therefore be paid, or be gas detention's crossing when the spendable part cannot pay it (`SATIN-DET-018`), and MUST NOT halt the frame out of gas.
   The frame's end, the revert or the stop, MUST leave the target's account and code in the transaction's read set (`SATIN-WIT-002`, `SATIN-WIT-012`), and MUST roll EIP-2929's accessed addresses back to the ending frame's checkpoint, taken when that frame started: the warming the frame took, its warming of the target included, is undone, and a warmth from before the frame started stays.
-  Whenever the call reaches its target's load, the load is a required read: a failed read of the target's account or code MUST be reported as `SATIN-VAL-010` classifies a failed read of the transaction's execution, and MUST NOT be taken as a target without a delegate ([Transaction Validation and Refusals](../block/transaction-validation.md)).
+  Whenever the call makes its target's load, the load is a required read: a failed read of the target's account or code MUST be reported as `SATIN-VAL-010` classifies a failed read of the transaction's execution, and MUST NOT be taken as a target without a delegate ([Transaction Validation and Refusals](../block/transaction-validation.md)).
 
 ## Constants
 
@@ -156,7 +156,12 @@ Satin runs the call's steps as with access on and refuses at the delegate's load
 The target is not volatile, and its read is complete when the delegate is refused, so the frame pays for it as for any account access: `COLD_ACCOUNT_ACCESS` for a cold target, `WARM_STORAGE_READ_COST` for a warm one.
 A free refusal at the load would have kept the reads cheap: the beneficiary's address is fixed, so accounts that delegate to it are created once and called by anyone, and in a loop each was read and refused for about 181 gas.
 The value-transfer cost is given back because no value moves, and the delegate's access is not charged because the delegate is not read.
-This is a change from [Rex6](../../upgrades/rex6.md), which charged such a call nothing, and a caller sees three effects of it: it gets back 3,000 or 100 gas less from a refused call; a call that cannot pay its earlier steps halts or is stopped before it reads its target, which changes the gas it returns and the transaction's read set; and a cold surcharge that is gas detention's crossing ends the frame with the 68 bytes of `MegaLimitExceeded(2, limit)` instead of the 36 bytes of `VolatileDataAccessDisabled(10)`.
+This is a change from [Rex6](../../upgrades/rex6.md), which read the target before any charge and refused such a call for free, and a caller sees its effects.
+For a call that reaches the delegate refusal, the retained regular charge is the opcode's own memory expansion plus 3,000 for a cold target or 100 for a warm target; when the cold surcharge is gas detention's crossing, only 100 and the memory expansion remain charged.
+A call that fails or is stopped before the target's load, or whose cold load is skipped for insufficient whole regular gas, does not read the target.
+A target and its code already loaded before a delegation-guard failure remain in the transaction's read set.
+Either failure returns different gas from Rex6's free refusal, and the first also leaves out of the read set a target Rex6 read.
+A cold surcharge that is gas detention's crossing ends the frame with the 68 bytes of `MegaLimitExceeded(2, limit)` instead of the 36 bytes of `VolatileDataAccessDisabled(10)`.
 
 **Why does a delegate refusal keep the call's memory expansion charged?**
 The call expands its memory before it loads its target, so by the refusal the node has done that work.
@@ -169,6 +174,7 @@ Under gas detention a cold load is decided on the frame's whole regular gas, its
 On this path that charge is the cold surcharge.
 Such a stop reads one target and keeps at least the call's static cost, `WARM_STORAGE_READ_COST`, as compute, which no revert or stop gives back, and the first can come only once the allowance, what the limit leaves the transaction, is below `COLD_ACCOUNT_ACCESS` after the call's memory expansion; so at most 29 such reads fit in a transaction's last allowance window, whatever the program.
 The base layer's call path has a tail of its own, which this rule inherits and does not change: a call whose target and non-beneficiary delegate are both cold loads both accounts before it deducts their combined charge, 5,900 after its static cost, so its window is an allowance below 6,000, it reads two accounts a call, and at most 59 such calls, 118 accounts, fit in it.
+A pre-built call stack that discards each returned status reads 116 accounts in 58 calls; reusing that status as the next call's gas operand permits 59 calls and 118 account reads.
 Both bounds are accepted: they follow from deciding a load on the whole regular gas and a charge on the spendable part, they apply once, at the end of a transaction's allowance, and a loop with any overhead of its own reaches fewer reads.
 
 **Why is `BLOBHASH` not refused?**
