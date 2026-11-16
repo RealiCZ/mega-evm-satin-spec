@@ -26,10 +26,12 @@ The exemption is only safe if the transactions that receive it are exactly the p
 - `SATIN-MST-002` A transaction of the system shape whose caller is the live system address (see [SequencerRegistry](sequencer-registry.md), `SATIN-REG-002`) MUST be a Mega System Transaction.
 - `SATIN-MST-003` A transaction whose caller is the live system address and that does not have the system shape MUST be invalid, whatever its type: a transaction other than a deposit MUST be rejected (see [Transaction Validation and Refusals](../block/transaction-validation.md)), and a deposit, which never has the system shape, MUST be included as a failed deposit, which runs no call (see [Deposit Transactions](../block/deposits.md)); that includes a deposit handed to the node already carrying the promotion's source hash.
 - `SATIN-MST-004` A transaction whose caller is any other address MUST NOT be a Mega System Transaction, and MUST be validated and charged as a user's: that includes a transaction from an address a rotation retired, which is no longer the live system address.
+  This does not decide whether the transaction is system-originated: `SATIN-MST-007` decides that, and for a system-originated one — a transaction from `SYSTEM_CALLER`, or a deposit carrying `MEGA_SYSTEM_TRANSACTION_SOURCE_HASH` — `SATIN-MST-008` overrides its pricing and resource treatment.
 - `SATIN-MST-005` A Mega System Transaction MUST be validated before it is promoted to a deposit, and a failure MUST be a rejection: it MUST carry a chain id, equal to the chain's; its nonce MUST equal the system address's nonce; and the system address MUST hold no code other than an EIP-7702 delegation indicator, as [EIP-3607](https://eips.ethereum.org/EIPS/eip-3607) requires of any sender.
   The chain-id check MUST be made whatever the node's configuration says (`SATIN-VAL-006`); the nonce and EIP-3607 checks are those every sender is held to, and a configuration that switches either off for a user's transaction switches it off for a Mega System Transaction too.
   Once it passes them, the transaction MUST be executed as a deposit from the system address to its recipient, with its value, gas limit and input, no mint, and the gas price zero: no signature, nonce, fee or balance-for-fee check of its own is made, no fee is charged and no fee recipient is credited, the caller its recipient sees is the system address, and the system address's nonce is bumped as a deposit's sender's is.
   A check the deposit then fails, or a first frame that halts, makes it a failed deposit (see [Deposit Transactions](../block/deposits.md)).
+  Promotion changes execution only: the block holds the transaction as a legacy, non-deposit transaction (`SATIN-BASE-008`, `SATIN-BASE-009`, `SATIN-BLK-007`), and its receipt MUST be a legacy (type `0x0`) receipt, with no deposit nonce and no deposit receipt version, whose status and gas used follow the promoted execution's outcome: a success when its own frame succeeds, and a failure when that frame reverts or when the transaction ends as a failed deposit, which uses its whole gas limit (`SATIN-DEP-004`).
 - `SATIN-MST-006` The promotion MUST stamp the deposit with the source hash `MEGA_SYSTEM_TRANSACTION_SOURCE_HASH`.
 
 ### The protocol's own work
@@ -72,6 +74,9 @@ Satin includes such a deposit as a failed deposit, which runs no call (`SATIN-MS
 A deposit checks no signature, nonce or chain id, because L1 derivation protects it from replay; a Mega System Transaction has no such protection.
 The chain id keeps it from being replayed on another chain, the nonce on this one, and EIP-3607 keeps a contract address from sending it.
 The chain-id check is fixed on, as every transaction's is; the nonce and code checks follow the configuration switches every sender's follow, which block execution never turns off.
+
+**Why does a promoted transaction keep a legacy receipt?**
+A receipt's type is its transaction's ([EIP-2718](https://eips.ethereum.org/EIPS/eip-2718)), and the block carries the Mega System Transaction in its legacy envelope; the promotion is how the node executes it, not a change of the transaction the block holds, so nothing of the deposit it runs as reaches the receipt but its outcome.
 
 **Why decide system origin on the transaction's own fields?**
 In a block the protocol's own transactions are the promoted Mega System Transactions: no transaction a block derives from L1 carries the promotion's source hash, and nobody holds a key for `SYSTEM_CALLER`.
