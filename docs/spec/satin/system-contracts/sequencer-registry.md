@@ -124,7 +124,7 @@ interface ISequencerRegistry {
 - `SATIN-REG-008` Every block MUST deploy the registry as a step of its pre-block sequence, after the due-change read and the `applyPendingChanges()` call (see [System Calls and the Pre-Block Sequence](../block/system-calls.md)), by what the state then holds at `SEQUENCER_REGISTRY_ADDRESS`:
   - an account whose code hash is `SEQUENCER_REGISTRY_CODE_HASH` (version 2.0.0) MUST be left as it is, and recorded as a read-only entry;
   - an account whose code hash is `SEQUENCER_REGISTRY_V1_CODE_HASH` (version 1.0.0) MUST be migrated in place: its code replaced by version 2.0.0, slot 13 (`_minRotationDelay`) written with the configured minimum rotation delay, and every other slot — the roles, the pending changes, the histories — kept, as its nonce and balance are;
-  - an address with no account, or an account without code, MUST receive version 2.0.0 as a new contract, an existing account's nonce and balance kept and its storage cleared, and its storage seeded with: slots 0 (`_currentSystemAddress`) and 4 (`_initialSystemAddress`) the address `MEGA_SYSTEM_ADDRESS`; slots 1 (`_currentSequencer`) and 5 (`_initialSequencer`) the configured initial sequencer; slot 2 (`_admin`) the configured initial admin; slot 6 (`_initialFromBlock`) the block's number; and slot 13 (`_minRotationDelay`) the configured minimum rotation delay;
+  - an address with no account, or an account without code, MUST receive version 2.0.0 as a new contract, an existing account's nonce, balance and storage kept, and its storage seeded with: slots 0 (`_currentSystemAddress`) and 4 (`_initialSystemAddress`) the address `MEGA_SYSTEM_ADDRESS`; slots 1 (`_currentSequencer`) and 5 (`_initialSequencer`) the configured initial sequencer; slot 2 (`_admin`) the configured initial admin; slot 6 (`_initialFromBlock`) the block's number; and slot 13 (`_minRotationDelay`) the configured minimum rotation delay — the seed overwriting those seven slots, whatever an existing account held in them, and every other slot staying as it was;
   - an account holding any other code MUST make the block invalid: the registry's storage is never overwritten by code it was not migrated to.
 
   The step writes nothing else, is charged nothing and counts toward none of the block's counters.
@@ -168,6 +168,11 @@ The initial system address is not configurable: it is `MEGA_SYSTEM_ADDRESS`, the
 **Why never overwrite other code at the registry's address?**
 Unlike the other system contracts, the registry holds roles and histories in its storage; replacing foreign code without a migration for it would reinterpret that storage under another layout.
 The one migration is version 1.0.0's, whose slots 0 to 12 version 2.0.0 keeps: the code is replaced and only the new slot written, so a pending change scheduled under version 1.0.0 still activates.
+
+**Why keep the storage of an account without code?**
+Installing the registry's code is then one rule, as it is for the other five contracts (`SATIN-SYSC-003`) and for the migration: the code is written, the slots the step names are written, and nothing else is.
+Clearing the account's storage would be an account-wide deletion, of slots the step never reads and the witness does not carry.
+The specification excludes a block-start state in which an account without code holds storage at the registry's address ([System Contracts](overview.md), `SATIN-SYSC-005`), rather than requiring the step to clear storage it did not read: a normal block installs the registry's code before its transactions, code that an EIP-7702 authorization or a colliding creation cannot replace, and the exclusion also covers a genesis allocation or a test's fixture built outside that history.
 
 ## Security Considerations
 

@@ -41,7 +41,10 @@ A deposit that cannot be executed must still be recorded, and the record must sa
 - `SATIN-DEP-006` A failed deposit MUST keep the data size of its body and of the Oracle hints it admitted (see [Oracle](../system-contracts/oracle.md)), and MUST return no withheld gas, no unspent gas and no reservoir to its sender.
 - `SATIN-DEP-008` A deposit whose caller is the live system address MUST be a failed deposit (see [Mega System Transactions](../system-contracts/system-tx.md), `SATIN-MST-003`), and so MUST one handed to the node already carrying the promotion's source hash from that address.
   A deposit that carries the base layer's system-transaction flag, which the base layer refuses from Regolith on, MUST be a failed deposit too.
-- `SATIN-DEP-012` A deposit that fails before its first frame MUST make no load for its first frame's start: nothing of its recipient, nor of the account its creation would create, beyond what it loads in another role (its sender, when the recipient is the sender, is loaded all the same); it MUST load its sender's code only once its intrinsic gas and floor checks have passed, so a deposit that fails one of them loads none of it.
+- `SATIN-DEP-012` A deposit that fails validation, or cannot pay a charge made before step 4 of `SATIN-SCHED-008`, MUST make no load for its first frame's start: nothing of its recipient, nor of its created address, beyond what it loads in another role (its sender, when the recipient is the sender, is loaded all the same).
+  A deposit that reaches step 4 MUST make there the load `SATIN-SCHED-008` requires for that start, of its recipient or of its created address, and MUST retain that load in its returned state even when it then fails: at step 4, at step 5, or in its first frame.
+  One that fails at step 5, its recipient holding an EIP-7702 delegation indicator, retains its recipient's load and loads the delegate only as `SATIN-SCHED-008` allows: not at all when it cannot pay `WARM_STORAGE_READ_COST`, nor, for a delegate that is not warm, when it cannot pay the additional cold access.
+  A deposit MUST load its sender's code only once its intrinsic gas and floor checks have passed, so a deposit that fails one of them loads none of it.
   What a deposit that fails loads otherwise is what [The Stateless Witness](stateless-witness.md) specifies for every transaction.
 
 ### Outside the specification
@@ -85,8 +88,9 @@ No chain can reach it: all the ether in existence is about 1.2 × 10^26 wei, far
 The base layer's implementations disagree on it — saturating on success, a checked or a wrapping credit on failure — and defining one would bind every node to a behaviour no block can exercise.
 A value transfer that would overflow its recipient's balance is outside the specification for the same reason, for a deposit as for any transaction (`SATIN-BASE-011`).
 
-**Why does a deposit that fails early load nothing of its recipient?**
-The read set is part of what a stateless validator is given; a deposit refused before its first frame decides nothing on its recipient, so loading it would put an account in the witness that no execution reads.
+**Why does a deposit that fails early make no load for its first frame's start, and one that fails at step 4 keep that load?**
+The read set is part of what a stateless validator is given; a deposit refused by its validation, or by a charge of steps 1 to 3 of `SATIN-SCHED-008`, decides nothing on its recipient's account, so it makes no load for that start, beyond loads in another role (a recipient that is the sender is loaded at validation): a load for the start would put an account in the witness that no execution reads.
+At step 4 the deposit must load its recipient, or its created address, to know whether that account is empty under EIP-161 and so whether it owes the account's state gas; a deposit that cannot pay that charge, or a delegate's access at step 5, fails on what it read, so the replay makes the same read, and the witness must carry it.
 
 ## Security Considerations
 
@@ -94,7 +98,8 @@ The read set is part of what a stateless validator is given; a deposit refused b
 - A node that returns unspent gas or reservoir for a failed deposit reports a gas used other nodes do not, and moves the block's cumulative gas.
 - A node that refuses a deposit, instead of including it as a failed deposit, cannot build the block the derivation requires.
 - A node that treats a stopped deposit as failed takes back the effects of what ran and keeps the mint only; the deposit's own frame's effects then differ from every other node's.
-- A node that loads a failed deposit's recipient adds an account to the witness the replay never reads; a validator holding the minimal witness then fails to reproduce the node's read set.
+- A node that makes a load for the first frame's start of a deposit that failed before step 4, beyond what the deposit loads in another role, adds an account to the witness the replay never reads; a validator holding the minimal witness then fails to reproduce the node's read set.
+- A node that drops the step-4 load of a deposit that then failed leaves out of the witness an account the replay reads to decide the failure; a validator holding that witness cannot re-execute the deposit.
 
 ## Spec History
 
