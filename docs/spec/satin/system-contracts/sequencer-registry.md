@@ -172,7 +172,7 @@ The one migration is version 1.0.0's, whose slots 0 to 12 version 2.0.0 keeps: t
 **Why keep the storage of an account without code?**
 Installing the registry's code is then one rule, as it is for the other five contracts (`SATIN-SYSC-003`) and for the migration: the code is written, the slots the step names are written, and nothing else is.
 Clearing the account's storage would be an account-wide deletion, of slots the step never reads and the witness does not carry.
-No chain reaches the case with storage to keep: the registry holds its code from its first deployment on, and nothing writes storage at its address while it has none; a prestate that gives a code-less account there storage, a genesis allocation or a test's fixture, is outside the specification ([System Contracts](overview.md), `SATIN-SYSC-005`).
+The specification excludes a block-start state in which an account without code holds storage at the registry's address ([System Contracts](overview.md), `SATIN-SYSC-005`), rather than requiring the step to clear storage it did not read: a normal block installs the registry's code before its transactions, code that an EIP-7702 authorization or a colliding creation cannot replace, and the exclusion also covers a genesis allocation or a test's fixture built outside that history.
 
 ## Security Considerations
 

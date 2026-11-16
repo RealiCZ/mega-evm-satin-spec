@@ -88,8 +88,8 @@ No chain can reach it: all the ether in existence is about 1.2 × 10^26 wei, far
 The base layer's implementations disagree on it — saturating on success, a checked or a wrapping credit on failure — and defining one would bind every node to a behaviour no block can exercise.
 A value transfer that would overflow its recipient's balance is outside the specification for the same reason, for a deposit as for any transaction (`SATIN-BASE-011`).
 
-**Why does a deposit that fails early load nothing of its recipient, and one that fails at step 4 keep its load?**
-The read set is part of what a stateless validator is given; a deposit refused by its validation, or by a charge of steps 1 to 3 of `SATIN-SCHED-008`, decides nothing on its recipient, so loading it would put an account in the witness that no execution reads.
+**Why does a deposit that fails early make no load for its first frame's start, and one that fails at step 4 keep that load?**
+The read set is part of what a stateless validator is given; a deposit refused by its validation, or by a charge of steps 1 to 3 of `SATIN-SCHED-008`, decides nothing on its recipient's account, so it makes no load for that start, beyond loads in another role (a recipient that is the sender is loaded at validation): a load for the start would put an account in the witness that no execution reads.
 At step 4 the deposit must load its recipient, or its created address, to know whether that account is empty under EIP-161 and so whether it owes the account's state gas; a deposit that cannot pay that charge, or a delegate's access at step 5, fails on what it read, so the replay makes the same read, and the witness must carry it.
 
 ## Security Considerations
@@ -98,7 +98,7 @@ At step 4 the deposit must load its recipient, or its created address, to know w
 - A node that returns unspent gas or reservoir for a failed deposit reports a gas used other nodes do not, and moves the block's cumulative gas.
 - A node that refuses a deposit, instead of including it as a failed deposit, cannot build the block the derivation requires.
 - A node that treats a stopped deposit as failed takes back the effects of what ran and keeps the mint only; the deposit's own frame's effects then differ from every other node's.
-- A node that loads the recipient of a deposit that failed before step 4 adds an account to the witness the replay never reads; a validator holding the minimal witness then fails to reproduce the node's read set.
+- A node that makes a load for the first frame's start of a deposit that failed before step 4, beyond what the deposit loads in another role, adds an account to the witness the replay never reads; a validator holding the minimal witness then fails to reproduce the node's read set.
 - A node that drops the step-4 load of a deposit that then failed leaves out of the witness an account the replay reads to decide the failure; a validator holding that witness cannot re-execute the deposit.
 
 ## Spec History

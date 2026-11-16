@@ -66,7 +66,7 @@ If two nodes disagreed on which addresses are system contracts, on the code thos
 ### Outside the specification
 
 - `SATIN-SYSC-005` A state that a block starts from and that holds storage at a system contract's address, in an account without code — a genesis allocation, say, or a test's fixture — is an invalid prestate: the execution of a block from it lies outside this specification, whether `SATIN-SYSC-003` or `SATIN-REG-008` deploys the contract.
-  Any other storage at those addresses is within the specification, and a deployment that installs or replaces a contract's code keeps it, but for the slots `SATIN-REG-008` seeds or migrates.
+  Other storage at those addresses is not excluded by this rule; a deployment permitted by `SATIN-SYSC-003` or `SATIN-REG-008` keeps it, except for the slots `SATIN-REG-008` seeds or migrates.
 
 ## Constants
 
@@ -102,10 +102,10 @@ Rex6 makes every block install a system contract that is missing and rewrite one
 On a chain that came through the Rex era the contracts are already right, so the step reads them and writes nothing; it rewrites only code, never the storage contracts and callers depend on, and the registry, whose storage holds roles and histories, is seeded only when it is new.
 
 **Why is storage without code at a system contract's address outside the specification?**
-No chain reaches it.
-Every block installs the system contracts before its first transaction, and nothing writes storage at a system contract's address while it holds no code: a frame runs there only on the code the address holds, no creation derives one of these addresses, and no key can sign an EIP-7702 authorization for one.
-Such storage can only come from a state built apart from the chain, a genesis allocation or a test's fixture, and defining what a deployment does with it would bind every node to a behaviour no chain exercises.
-Within the specification, installing a contract's code keeps the account's storage, in the registry's seeded branch as at the other five addresses (`SATIN-REG-008`), and the code-less account a deployment finds holds no storage to keep.
+The specification excludes such a block-start state rather than requiring a deployment to clear storage it did not read.
+A normal block installs the prescribed code at these addresses before its transactions (`SATIN-SYSC-003`), and installed code that is not an EIP-7702 delegation indicator cannot be replaced by an EIP-7702 authorization (`SATIN-AUTH-003`) or by a colliding creation (`SATIN-SD-016`).
+The exclusion also covers the states built outside that execution history, a genesis allocation or a test's fixture.
+Within the specification, installing a contract's code keeps the account's storage, in the registry's seeded branch as at the other five addresses (`SATIN-REG-008`).
 
 ## Security Considerations
 
