@@ -51,7 +51,7 @@ Rex6 bounded it by lowering the transaction's limit on a separate compute-gas le
   Compute can therefore exceed the transaction's regular ledger by the stipends of its value calls.
 - `SATIN-DET-011` What a halting frame burns — the regular gas it had left when it halted — MUST NOT count as compute, whatever it could not pay: a dynamic charge, an opcode's static gas, a cold access, or state or history gas its regular gas had to pay.
   A precompile that runs out of gas MUST count nothing of its forward as compute: it burns the forward, a value call's stipend included, unless it is the crossing (`SATIN-DET-021`), and then the forward returns to its caller.
-  A precompile that halts (out of gas, or on a check it makes after its gas charge, a ModExp input over EIP-7823's bound among them) burns its whole forward, its charged price and a value call's stipend included, and MUST count none of it as compute; only a precompile that is the crossing (`SATIN-DET-021`) returns its forward.
+  A precompile that halts — out of gas, on a check it makes after its gas charge (a ModExp input over EIP-7823's bound among them), or on an input over its size limit, which fails the call before any gas check (`SATIN-PCMP-005`) — burns its whole forward, its charged price, when it has charged one, and a value call's stipend included, and MUST count none of it as compute; only a precompile that is the crossing (`SATIN-DET-021`) returns its forward.
 
 ### The limit
 
@@ -85,7 +85,7 @@ A transaction that read volatile data therefore runs exactly as it would without
   The charges stated as one are the exceptions: an Oracle read's cold access (`SATIN-ORCL-004`) and an interceptor's answer (`SATIN-DET-025`).
   A `BALANCE` of an account that is not warm, in a frame with 50 of spendable gas and 1,000 of regular gas in all, is stopped at its static cost of `WARM_STORAGE_READ_COST`, which the 1,000 can pay; it does not run out of gas on the 3,000 the access costs in all.
 - `SATIN-DET-019` At the crossing the transaction's compute is at most the limit and less than the crossing charge short of it; a caller the stop returns into MUST resume held to what the limit leaves the transaction, so any regular charge of its own past that is a crossing too.
-  What a halting frame burns adds nothing to compute, while its paid work before the halt still counts, so no halt takes the transaction's compute past the limit: the compute since a read is at most its cap.
+  What a halting frame burns adds nothing to compute, while its paid work before the halt still counts, but for a halting precompile's charged price, which is part of the forward it burns and counts nothing (`SATIN-DET-011`); so no halt takes the transaction's compute past the limit: the compute since a read is at most its cap.
 - `SATIN-DET-020` A regular charge beyond the frame's whole regular gas, and every other out-of-gas, MUST halt as it would without the read.
 
 ### Precompiles

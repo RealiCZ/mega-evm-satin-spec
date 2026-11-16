@@ -1,5 +1,5 @@
 ---
-description: Satin (unstable) — System Contracts. The six MegaETH system contracts under Satin, their addresses and the code each must hold, their deployment in every block, and how a system contract differs from a precompile.
+description: Satin (unstable) — System Contracts. The six MegaETH system contracts under Satin, their addresses and the code each must hold, their deployment in every block, how a system contract differs from a precompile, and the prestate at their addresses outside the specification.
 spec: Satin
 maturity: unstable
 ---
@@ -10,7 +10,7 @@ maturity: unstable
 **Unstable** — Satin is under active development: everything on this page may change before Satin is frozen.
 {% endhint %}
 
-Abstract: The registry of MegaETH's six system contracts: their fixed addresses, the code each address holds, how every block deploys them before its transactions, and the distinction between a system contract, whose methods run as bytecode unless the node intercepts them, and a precompile.
+Abstract: The registry of MegaETH's six system contracts: their fixed addresses, the code each address holds, how every block deploys them before its transactions, the distinction between a system contract, whose methods run as bytecode unless the node intercepts them, and a precompile, and the prestate at their addresses that lies outside the specification.
 
 ## Motivation
 
@@ -63,6 +63,11 @@ If two nodes disagreed on which addresses are system contracts, on the code thos
   The one exception is a call the node intercepts: a call to an intercepted method of a system contract is answered by the node, before a frame is built, as [Call Interception](interception.md) specifies, and every other call runs the contract's bytecode.
   A `keylessDeploy` call that is a transaction's own frame is a native creation rather than an interception (see [KeylessDeploy](keyless-deploy.md)).
 
+### Outside the specification
+
+- `SATIN-SYSC-005` A state that a block starts from and that holds storage at a system contract's address, in an account without code — a genesis allocation, say, or a test's fixture — is an invalid prestate: the execution of a block from it lies outside this specification, whether `SATIN-SYSC-003` or `SATIN-REG-008` deploys the contract.
+  Any other storage at those addresses is within the specification, and a deployment that installs or replaces a contract's code keeps it, but for the slots `SATIN-REG-008` seeds or migrates.
+
 ## Constants
 
 | Constant                             | Value                                                                | Description                                    |
@@ -95,6 +100,12 @@ Satin changes how the node executes around them (Oracle reads, interception, key
 **Why deploy in every block?**
 Rex6 makes every block install a system contract that is missing and rewrite one whose code differs, and Satin keeps that rule: a chain always runs the contracts the spec names, a chain on which Satin is active from genesis receives them in its first block, and a contract whose code another path changed is installed again.
 On a chain that came through the Rex era the contracts are already right, so the step reads them and writes nothing; it rewrites only code, never the storage contracts and callers depend on, and the registry, whose storage holds roles and histories, is seeded only when it is new.
+
+**Why is storage without code at a system contract's address outside the specification?**
+No chain reaches it.
+Every block installs the system contracts before its first transaction, and nothing writes storage at a system contract's address while it holds no code: a frame runs there only on the code the address holds, no creation derives one of these addresses, and no key can sign an EIP-7702 authorization for one.
+Such storage can only come from a state built apart from the chain, a genesis allocation or a test's fixture, and defining what a deployment does with it would bind every node to a behaviour no chain exercises.
+Within the specification, installing a contract's code keeps the account's storage, in the registry's seeded branch as at the other five addresses (`SATIN-REG-008`), and the code-less account a deployment finds holds no storage to keep.
 
 ## Security Considerations
 
