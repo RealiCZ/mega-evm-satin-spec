@@ -34,7 +34,7 @@ A deposit that cannot be executed must still be recorded, and the record must sa
 
 ### The failed deposit
 
-- `SATIN-DEP-004` A deposit MUST become a failed deposit when it fails a validation check (see [Transaction Validation and Refusals](transaction-validation.md)), when it cannot pay a charge made before its first frame (the state gas of the caller account it creates, among them), or when its own frame halts — a first frame whose value the sender, its mint credited, cannot fund included.
+- `SATIN-DEP-004` A deposit MUST become a failed deposit when it fails a validation check that applies to deposits (see [Transaction Validation and Refusals](transaction-validation.md)), when it cannot pay a charge made before its first frame (the state gas of the caller account it creates, among them), or when its own frame halts — a first frame whose value the sender, its mint credited, cannot fund included.
   A failed deposit MUST bump its sender's nonce, MUST credit its mint to its sender, MUST use its whole gas limit, the reservoir included, and MUST apply nothing else: every other change its execution made is taken back.
 - `SATIN-DEP-005` A failed deposit MUST report its whole gas limit as regular gas, and no state gas and no history gas, on the transaction's ledgers and on the block's.
   The caller account it creates for a sender that was empty under EIP-161 (`SATIN-STATE-011`) carries no state gas, unlike the one a deposit that runs to a success or a revert creates, and it MUST still count as one unit of state growth, on the transaction's reported usage and on the block's counter.

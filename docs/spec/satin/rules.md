@@ -399,9 +399,9 @@ Home: [Contract Size Limits](evm/contract-limits.md)
 | Id | Rule |
 | --- | --- |
 | [`SATIN-SIZE-001`](evm/contract-limits.md) | Deployed code MUST be at most `MAX_CONTRACT_SIZE` bytes. |
-| [`SATIN-SIZE-002`](evm/contract-limits.md) | Initcode MUST be at most `MAX_INITCODE_SIZE` bytes, twice `MAX_CONTRACT_SIZE`. |
+| [`SATIN-SIZE-002`](evm/contract-limits.md) | Initcode MUST be at most `MAX_INITCODE_SIZE` bytes, twice `MAX_CONTRACT_SIZE`, at a creation opcode (`SATIN-SIZE-003`), in a creation transaction other than a deposit (`SATIN-SIZE-004`) and in a keyless deployment … |
 | [`SATIN-SIZE-003`](evm/contract-limits.md) | These are Ethereum's size checks at MegaETH's sizes, not resource limits: initcode over `MAX_INITCODE_SIZE` MUST halt the creating frame at the creation opcode, and deployed code over `MAX_CONTRACT_SIZE` MUST halt the … |
-| [`SATIN-SIZE-004`](evm/contract-limits.md) | A creation transaction other than a deposit whose initcode is over `MAX_INITCODE_SIZE` MUST be rejected at validation (Transaction Validation and Refusals); a deposit is never rejected, and one that fails this check is … |
+| [`SATIN-SIZE-004`](evm/contract-limits.md) | A creation transaction other than a deposit whose initcode is over `MAX_INITCODE_SIZE` MUST be rejected at validation (Transaction Validation and Refusals). |
 | [`SATIN-SIZE-005`](evm/contract-limits.md) | `CREATE` and `CREATE2` MUST make their checks and charges in this order, and a node MUST add no charge ahead of them: |
 | [`SATIN-SIZE-006`](evm/contract-limits.md) | A creation in a static frame therefore MUST fail before its operands are read, and a `CREATE2` short of its salt MUST pay the initcode cost and the memory before it fails on the missing operand. |
 
@@ -576,7 +576,7 @@ Home: [Transaction Validation and Refusals](block/transaction-validation.md)
 | [`SATIN-VAL-005`](block/transaction-validation.md) | A transaction whose caller is the live system address and that does not have the system shape MUST be rejected, unless it is a deposit (see Mega System Transactions, `SATIN-MST-003`). |
 | [`SATIN-VAL-006`](block/transaction-validation.md) | A transaction MUST be rejected when it carries a chain id that is not the chain's, or when it is a typed transaction (any type but legacy and deposit) and carries none. |
 | [`SATIN-VAL-007`](block/transaction-validation.md) | A transaction MUST be rejected when it is a Mega System Transaction that fails its chain-id, nonce or EIP-3607 check (`SATIN-MST-005`), and when it fails any validation of the base layer (see Base Layer). |
-| [`SATIN-VAL-008`](block/transaction-validation.md) | A deposit MUST NOT be rejected for failing a validation check: a deposit that fails any check of this page, or of the base layer, MUST be included as a failed deposit instead (see Deposit Transactions). |
+| [`SATIN-VAL-008`](block/transaction-validation.md) | A deposit MUST NOT be rejected for failing a validation check: a deposit that fails a check of this page or of the base layer that applies to deposits MUST be included as a failed deposit instead (see Deposit … |
 | [`SATIN-VAL-010`](block/transaction-validation.md) | A read a node fails to make for a transaction MUST be reported by its cause, and the transaction MUST NOT be settled, as a failed deposit or otherwise: |
 
 Retired ids:
@@ -594,7 +594,7 @@ Home: [Deposit Transactions](block/deposits.md)
 | [`SATIN-DEP-001`](block/deposits.md) | That a deposit pays history gas as any transaction does — for its body, its calldata, its logs, its write records and its deposited code — is the rule `SATIN-HIST-016` (see History Gas); a deposit whose gas limit cannot … |
 | [`SATIN-DEP-002`](block/deposits.md) | That a deposit which is not system-originated is priced by the SALT bucket its state lands in, held to every per-transaction limit and frame budget, and detained after a read of volatile data, as any transaction is, is … |
 | [`SATIN-DEP-003`](block/deposits.md) | A deposit — or a Mega System Transaction, which executes as one — whose caller is empty under EIP-161 when the deposit is executed (no account, or nonce zero, zero balance and no code: `SATIN-STATE-011`) MUST be charged … |
-| [`SATIN-DEP-004`](block/deposits.md) | A deposit MUST become a failed deposit when it fails a validation check (see Transaction Validation and Refusals), when it cannot pay a charge made before its first frame (the state gas of the caller account it creates, … |
+| [`SATIN-DEP-004`](block/deposits.md) | A deposit MUST become a failed deposit when it fails a validation check that applies to deposits (see Transaction Validation and Refusals), when it cannot pay a charge made before its first frame (the state gas of the … |
 | [`SATIN-DEP-005`](block/deposits.md) | A failed deposit MUST report its whole gas limit as regular gas, and no state gas and no history gas, on the transaction's ledgers and on the block's. |
 | [`SATIN-DEP-006`](block/deposits.md) | A failed deposit MUST keep the data size of its body and of the Oracle hints it admitted (see Oracle), and MUST return no withheld gas, no unspent gas and no reservoir to its sender. |
 | [`SATIN-DEP-007`](block/deposits.md) | That a deposit whose own frame succeeds, reverts or is stopped by a limit settles as an ordinary transaction, a stop being a revert and not a failed deposit, is the rule `SATIN-STOP-010` with `SATIN-OUT-014` (see Halts, … |
