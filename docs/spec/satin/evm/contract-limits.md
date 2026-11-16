@@ -21,10 +21,12 @@ The order in which a creation opcode makes its checks and charges is observable:
 ## Specification
 
 - `SATIN-SIZE-001` Deployed code MUST be at most `MAX_CONTRACT_SIZE` bytes.
-- `SATIN-SIZE-002` Initcode MUST be at most `MAX_INITCODE_SIZE` bytes, twice `MAX_CONTRACT_SIZE`.
+- `SATIN-SIZE-002` Initcode MUST be at most `MAX_INITCODE_SIZE` bytes, twice `MAX_CONTRACT_SIZE`, at a creation opcode (`SATIN-SIZE-003`), in a creation transaction other than a deposit (`SATIN-SIZE-004`) and in a keyless deployment ([KeylessDeploy](../system-contracts/keyless-deploy.md)); a deposit's top-level creation is exempt, as `SATIN-SIZE-004` specifies.
+  The exemption covers that creation alone: a `CREATE` or `CREATE2` a deposit's initcode runs is checked as any creation opcode is, and a keyless deployment a deposit makes is refused by its own rule when its initcode is over the limit.
 - `SATIN-SIZE-003` These are Ethereum's size checks at MegaETH's sizes, not resource limits: initcode over `MAX_INITCODE_SIZE` MUST halt the creating frame at the creation opcode, and deployed code over `MAX_CONTRACT_SIZE` MUST halt the creation, each consuming the halting frame's regular gas.
   Neither is a limit stop ([Halts, Reverts and Stops](outcomes.md)).
-- `SATIN-SIZE-004` A creation transaction other than a deposit whose initcode is over `MAX_INITCODE_SIZE` MUST be rejected at validation ([Transaction Validation and Refusals](../block/transaction-validation.md)); a deposit is never rejected, and one that fails this check is a failed deposit ([Deposit Transactions](../block/deposits.md)).
+- `SATIN-SIZE-004` A creation transaction other than a deposit whose initcode is over `MAX_INITCODE_SIZE` MUST be rejected at validation ([Transaction Validation and Refusals](../block/transaction-validation.md)).
+  A deposit's top-level creation MUST NOT be checked against this initcode size limit; its creation MUST be executed subject to its other applicable checks and charges ([Deposit Transactions](../block/deposits.md)).
   A keyless deployment's initcode over the limit is refused by its own rule ([KeylessDeploy](../system-contracts/keyless-deploy.md)).
 - `SATIN-SIZE-005` `CREATE` and `CREATE2` MUST make their checks and charges in this order, and a node MUST add no charge ahead of them:
   1. the static context;
@@ -47,7 +49,7 @@ None.
 | Constant            | Value     | Description                                                   |
 | ------------------- | --------- | ------------------------------------------------------------- |
 | `MAX_CONTRACT_SIZE` | 524,288   | The most bytes deployed code may hold (512 KiB)                |
-| `MAX_INITCODE_SIZE` | 1,048,576 | The most bytes an initcode may hold (1 MiB)                    |
+| `MAX_INITCODE_SIZE` | 1,048,576 | The most bytes an initcode may hold (1 MiB), a deposit's top-level creation excepted (`SATIN-SIZE-004`) |
 | `CREATE_ACCESS`     | 12,000    | Regular gas of a creation's access ([Gas Schedule and Intrinsic Gas](gas-schedule.md)) |
 
 ## Rationale
@@ -62,6 +64,10 @@ Satin restores EIP-3860's ratio.
 **Why halts and not stops?**
 These are the base layer's own size checks; keeping them as halts keeps the gas a failing creation consumes what every Ethereum tool expects, and only the resource limits, which are MegaETH's, stop with a revert.
 
+**Why is a deposit's top-level creation not checked?**
+The base layer makes no initcode size check for a deposit: the OP Stack's deposit execution performs none, a deposit's size being bounded by L1, and Rex6 made none.
+Satin keeps that, so a deposit whose initcode is over the limit runs its creation, paying for the initcode as any creation transaction does, rather than becoming a failed deposit; the exemption is that creation's alone, and a creation opcode its initcode runs halts as any other does.
+
 **Why fix the order of the checks?**
 The order is the base layer's; stating it makes the one observable consequence explicit: a `CREATE2` short of its salt pays for its initcode first, which under detention turns a would-be halt into a stop.
 
@@ -69,6 +75,7 @@ The order is the base layer's; stating it makes the one observable consequence e
 
 - If a node checked the initcode size after charging its memory, a frame could be made to expand memory for an initcode it then refuses, and its gas used would differ from every other node's.
 - If either size check were made a revert, a failing creation would return gas the base layer consumes, and receipts would differ.
+- If a node checked a deposit's top-level initcode size, it would make a failed deposit of a creation every other node runs, and its state and receipts would differ.
 - If a node used Rex6's initcode limit, a creation between 548,864 and 1,048,576 bytes of initcode would halt on one node and run on another.
 
 ## Spec History

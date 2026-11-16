@@ -52,7 +52,8 @@ Beyond the base layer's checks, a transaction can carry a body too large for the
 
 ### Deposits and faults
 
-- `SATIN-VAL-008` A deposit MUST NOT be rejected for failing a validation check: a deposit that fails any check of this page, or of the base layer, MUST be included as a failed deposit instead (see [Deposit Transactions](deposits.md)).
+- `SATIN-VAL-008` A deposit MUST NOT be rejected for failing a validation check: a deposit that fails a check of this page or of the base layer that applies to deposits MUST be included as a failed deposit instead (see [Deposit Transactions](deposits.md)).
+  The base layer's deposit exemptions remain in force; in particular, the top-level contract-creation initcode size check does not apply to deposits (`SATIN-SIZE-004`).
   A Mega System Transaction is a legacy transaction until it has passed its own chain-id, nonce and EIP-3607 checks, so failing one of those is a rejection; once it has passed them it runs as a deposit, and a check it fails after that includes it as a failed deposit.
   A read the node fails to make is not a validation check, for a deposit as for any transaction: it is a fault (`SATIN-VAL-010`).
 - `SATIN-VAL-010` A read a node fails to make for a transaction MUST be reported by its cause, and the transaction MUST NOT be settled, as a failed deposit or otherwise:
